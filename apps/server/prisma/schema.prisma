@@ -1,0 +1,243 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum RoomRole {
+  OWNER
+  MODERATOR
+  MEMBER
+}
+
+enum TimerPhase {
+  FOCUS
+  SHORT_BREAK
+  LONG_BREAK
+}
+
+enum TimerStatus {
+  IDLE
+  RUNNING
+  PAUSED
+  COMPLETED
+}
+
+enum TaskStatus {
+  BACKLOG
+  TODO
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum NotificationType {
+  INFO
+  ROOM_INVITE
+  TIMER_COMPLETE
+  TASK_ASSIGNED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  avatarUrl    String?
+  bio          String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  profile         UserProfile?
+  ownedRooms      StudyRoom[]       @relation("RoomOwner")
+  memberships     RoomMember[]
+  createdTasks    Task[]            @relation("TaskCreator")
+  assignedTasks   Task[]            @relation("TaskAssignee")
+  pomodoroRecords PomodoroRecord[]
+  notifications   Notification[]
+  taskActivities  TaskActivity[]
+  roomActivities  RoomActivity[]
+
+  @@index([email])
+}
+
+model UserProfile {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dailyGoalMinutes   Int      @default(120)
+  timezone           String   @default("UTC")
+  themePreference    String   @default("dark")
+  soundEnabled       Boolean  @default(true)
+  autoStartBreaks    Boolean  @default(false)
+  autoStartPomodoros Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model StudyRoom {
+  id                    String   @id @default(uuid())
+  name                  String
+  description           String?
+  inviteCode            String   @unique
+  isPrivate             Boolean  @default(false)
+  focusDuration         Int      @default(1500) // 25 mins in seconds
+  shortBreakDuration    Int      @default(300)  // 5 mins in seconds
+  longBreakDuration     Int      @default(900)  // 15 mins in seconds
+  cyclesBeforeLongBreak Int      @default(4)
+  ownerId               String
+  owner                 User     @relation("RoomOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  members        RoomMember[]
+  timerState     TimerState?
+  sessions       StudySession[]
+  tasks          Task[]
+  activities     RoomActivity[]
+  pomodoroRecords PomodoroRecord[]
+
+  @@index([inviteCode])
+  @@index([ownerId])
+}
+
+model RoomMember {
+  id           String    @id @default(uuid())
+  roomId       String
+  room         StudyRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role         RoomRole  @default(MEMBER)
+  joinedAt     DateTime  @default(now())
+  lastActiveAt DateTime  @default(now())
+
+  @@unique([roomId, userId])
+  @@index([roomId])
+  @@index([userId])
+}
+
+model StudySession {
+  id                  String     @id @default(uuid())
+  roomId              String
+  room                StudyRoom  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  startedAt           DateTime   @default(now())
+  endedAt             DateTime?
+  totalDuration       Int        @default(0) // seconds
+  completedPomodoros  Int        @default(0)
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  timerStates         TimerState[]
+  pomodoroRecords     PomodoroRecord[]
+
+  @@index([roomId])
+  @@index([startedAt])
+}
+
+model TimerState {
+  id                 String       @id @default(uuid())
+  roomId             String       @unique
+  room               StudyRoom    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  sessionId          String?
+  session            StudySession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  phase              TimerPhase   @default(FOCUS)
+  status             TimerStatus  @default(IDLE)
+  startedAt          DateTime?
+  pausedAt           DateTime?
+  remainingSeconds   Int          @default(1500)
+  totalPhaseDuration Int          @default(1500)
+  currentCycle       Int          @default(1)
+  updatedAt          DateTime     @updatedAt
+
+  @@index([roomId])
+}
+
+model PomodoroRecord {
+  id              String        @id @default(uuid())
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roomId          String?
+  room            StudyRoom?    @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  sessionId       String?
+  session         StudySession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  phase           TimerPhase
+  durationMinutes Int
+  completedAt     DateTime      @default(now())
+
+  @@index([userId, completedAt])
+  @@index([roomId])
+}
+
+model Task {
+  id          String       @id @default(uuid())
+  roomId      String
+  room        StudyRoom    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  status      TaskStatus   @default(TODO)
+  priority    TaskPriority @default(MEDIUM)
+  assigneeId  String?
+  assignee    User?        @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  createdById String
+  createdBy   User         @relation("TaskCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  dueDate     DateTime?
+  position    Int          @default(0)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  activities  TaskActivity[]
+
+  @@index([roomId, status])
+  @@index([assigneeId])
+  @@index([createdById])
+}
+
+model TaskActivity {
+  id        String   @id @default(uuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String
+  details   Json?
+  createdAt DateTime @default(now())
+
+  @@index([taskId])
+}
+
+model RoomActivity {
+  id        String    @id @default(uuid())
+  roomId    String
+  room      StudyRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String
+  details   String?
+  createdAt DateTime  @default(now())
+
+  @@index([roomId, createdAt])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      NotificationType @default(INFO)
+  isRead    Boolean          @default(false)
+  link      String?
+  createdAt DateTime         @default(now())
+
+  @@index([userId, isRead])
+}

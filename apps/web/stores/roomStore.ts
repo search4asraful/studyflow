@@ -1,0 +1,115 @@
+import { create } from 'zustand';
+import {
+  StudyRoom,
+  RoomMember,
+  Task,
+  RoomActivity,
+  RoomRole,
+  SafeUser,
+  RoomStatePayload,
+} from '@studyflow/shared';
+
+interface RoomState {
+  room: StudyRoom | null;
+  role: RoomRole | null;
+  members: RoomMember[];
+  tasks: Task[];
+  activities: RoomActivity[];
+  isLoading: boolean;
+  error: string | null;
+
+  setRoomState: (payload: RoomStatePayload) => void;
+  updateMemberOnlineStatus: (userId: string, isOnline: boolean) => void;
+  addMember: (user: SafeUser) => void;
+  removeMember: (userId: string) => void;
+  
+  addTask: (task: Task) => void;
+  updateTask: (task: Task) => void;
+  deleteTask: (taskId: string) => void;
+  
+  addActivity: (activity: RoomActivity) => void;
+  clearRoom: () => void;
+}
+
+export const useRoomStore = create<RoomState>((set) => ({
+  room: null,
+  role: null,
+  members: [],
+  tasks: [],
+  activities: [],
+  isLoading: true,
+  error: null,
+
+  setRoomState: (payload) =>
+    set({
+      room: payload.room,
+      role: payload.role,
+      members: payload.members,
+      tasks: payload.tasks,
+      activities: payload.recentActivities || [],
+      isLoading: false,
+      error: null,
+    }),
+
+  updateMemberOnlineStatus: (userId, isOnline) =>
+    set((state) => ({
+      members: state.members.map((m) =>
+        m.userId === userId ? { ...m, isOnline, lastActiveAt: new Date().toISOString() } : m
+      ),
+    })),
+
+  addMember: (user) =>
+    set((state) => {
+      if (state.members.some((m) => m.userId === user.id)) return state;
+      const newMember: RoomMember = {
+        id: `mem_${Date.now()}`,
+        roomId: state.room?.id || '',
+        userId: user.id,
+        role: 'MEMBER',
+        user,
+        joinedAt: new Date().toISOString(),
+        isOnline: true,
+      };
+      return {
+        members: [...state.members, newMember],
+      };
+    }),
+
+  removeMember: (userId) =>
+    set((state) => ({
+      members: state.members.filter((m) => m.userId !== userId),
+    })),
+
+  addTask: (task) =>
+    set((state) => {
+      // Avoid duplicates
+      if (state.tasks.some((t) => t.id === task.id)) return state;
+      return { tasks: [task, ...state.tasks] };
+    }),
+
+  updateTask: (updatedTask) =>
+    set((state) => ({
+      tasks: state.tasks.map((t) => (t.id === updatedTask.id ? updatedTask : t)),
+    })),
+
+  deleteTask: (taskId) =>
+    set((state) => ({
+      tasks: state.tasks.filter((t) => t.id !== taskId),
+    })),
+
+  addActivity: (activity) =>
+    set((state) => ({
+      activities: [activity, ...state.activities.slice(0, 30)],
+    })),
+
+  clearRoom: () =>
+    set({
+      room: null,
+      role: null,
+      members: [],
+      tasks: [],
+      activities: [],
+      isLoading: true,
+      error: null,
+    }),
+}));

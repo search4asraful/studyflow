@@ -1,0 +1,285 @@
+import { Server as HttpServer } from 'http';
+import { Server as SocketIOServer, Socket } from 'socket.io';
+import jwt from 'jsonwebtoken';
+import cookie from 'cookie';
+import { env } from '../config/env';
+import { prisma } from '../config/prisma';
+import { TimerService } from '../services/timerService';
+import { TaskService } from '../services/taskService';
+import { RoomService } from '../services/roomService';
+import { SOCKET_EVENTS, SafeUser } from '../shared';
+
+interface AuthenticatedSocket extends Socket {
+  data: {
+    user: SafeUser;
+    joinedRooms: Set<string>;
+  };
+}
+
+export function setupSocketServer(httpServer: HttpServer): SocketIOServer {
+  const allowedOrigins = [
+    env.FRONTEND_URL.replace(/\/$/, ''),
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+  ];
+
+  const io = new SocketIOServer(httpServer, {
+    cors: {
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        const cleanOrigin = origin.replace(/\/$/, '');
+        if (
+          allowedOrigins.includes(cleanOrigin) ||
+          cleanOrigin.endsWith('.vercel.app')
+        ) {
+          return callback(null, true);
+        }
+        return callback(null, true);
+      },
+      credentials: true,
+      methods: ['GET', 'POST'],
+    },
+    pingInterval: 10000,
+    pingTimeout: 5000,
+  });
+
+  // Attach Socket.IO instance to services
+  TimerService.setSocketServer(io);
+  TaskService.setSocketServer(io);
+
+  // Authentication Middleware
+  io.use(async (socket: Socket, next) => {
+    try {
+      let token: string | undefined = socket.handshake.auth?.token;
+
+      if (!token && socket.handshake.headers.cookie) {
+        const parsedCookies = cookie.parse(socket.handshake.headers.cookie);
+        token = parsedCookies.access_token;
+      }
+
+      if (!token && socket.handshake.headers.authorization?.startsWith('Bearer ')) {
+        token = socket.handshake.headers.authorization.split(' ')[1];
+      }
+
+      if (!token) {
+        return next(new Error('Authentication error: Token required'));
+      }
+
+      const decoded = jwt.verify(token, env.JWT_SECRET) as { userId: string; email: string };
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.userId },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          avatarUrl: true,
+          bio: true,
+          createdAt: true,
+        },
+      });
+
+      if (!user) {
+        return next(new Error('Authentication error: User not found'));
+      }
+
+      socket.data.user = {
+        ...user,
+        createdAt: user.createdAt.toISOString(),
+      };
+      socket.data.joinedRooms = new Set<string>();
+
+      next();
+    } catch (err) {
+      next(new Error('Authentication error: Invalid token'));
+    }
+  });
+
+  io.on('connection', (rawSocket: Socket) => {
+    const socket = rawSocket as AuthenticatedSocket;
+    const user = socket.data.user;
+    // console.log(`[Socket] User connected: ${user.name} (${socket.id})`);
+
+    // Join room
+    socket.on(SOCKET_EVENTS.CLIENT.ROOM_JOIN, async (data: { roomId: string }, callback) => {
+      try {
+        const { roomId } = data;
+        if (!roomId) return;
+
+        // Verify or auto-join member
+        const roomDetails = await RoomService.getRoomDetails(roomId, user.id);
+
+        socket.join(`room:${roomId}`);
+        socket.data.joinedRooms.add(roomId);
+
+        TimerService.registerParticipant(roomId, user.id);
+
+        // Update lastActiveAt
+        await prisma.roomMember.updateMany({
+          where: { roomId, userId: user.id },
+          data: { lastActiveAt: new Date() },
+        });
+
+        // Notify other participants
+        socket.to(`room:${roomId}`).emit(SOCKET_EVENTS.SERVER.ROOM_PARTICIPANT_JOINED, {
+          user,
+          roomId,
+          timestamp: new Date().toISOString(),
+        });
+
+        // Send full authoritative room state back to the joiner
+        if (typeof callback === 'function') {
+          callback({ success: true, data: roomDetails });
+        } else {
+          socket.emit(SOCKET_EVENTS.SERVER.ROOM_STATE, roomDetails);
+        }
+      } catch (error: any) {
+        socket.emit(SOCKET_EVENTS.SERVER.ROOM_ERROR, {
+          message: error.message || 'Failed to join room',
+        });
+        if (typeof callback === 'function') {
+          callback({ success: false, error: error.message });
+        }
+      }
+    });
+
+    // Leave room
+    socket.on(SOCKET_EVENTS.CLIENT.ROOM_LEAVE, async (data: { roomId: string }) => {
+      try {
+        const { roomId } = data;
+        if (!roomId) return;
+
+        socket.leave(`room:${roomId}`);
+        socket.data.joinedRooms.delete(roomId);
+        TimerService.unregisterParticipant(roomId, user.id);
+
+        socket.to(`room:${roomId}`).emit(SOCKET_EVENTS.SERVER.ROOM_PARTICIPANT_LEFT, {
+          userId: user.id,
+          userName: user.name,
+          roomId,
+        });
+      } catch (err) {
+        console.error('[Socket] Leave room error:', err);
+      }
+    });
+
+    // Timer controls
+    socket.on(SOCKET_EVENTS.CLIENT.TIMER_START, async (data: { roomId: string }, callback) => {
+      try {
+        const state = await TimerService.startTimer(data.roomId, user.id);
+        if (typeof callback === 'function') callback({ success: true, data: state });
+      } catch (err: any) {
+        socket.emit(SOCKET_EVENTS.SERVER.ROOM_ERROR, { message: err.message });
+        if (typeof callback === 'function') callback({ success: false, error: err.message });
+      }
+    });
+
+    socket.on(SOCKET_EVENTS.CLIENT.TIMER_PAUSE, async (data: { roomId: string }, callback) => {
+      try {
+        const state = await TimerService.pauseTimer(data.roomId, user.id);
+        if (typeof callback === 'function') callback({ success: true, data: state });
+      } catch (err: any) {
+        socket.emit(SOCKET_EVENTS.SERVER.ROOM_ERROR, { message: err.message });
+        if (typeof callback === 'function') callback({ success: false, error: err.message });
+      }
+    });
+
+    socket.on(SOCKET_EVENTS.CLIENT.TIMER_RESUME, async (data: { roomId: string }, callback) => {
+      try {
+        const state = await TimerService.resumeTimer(data.roomId, user.id);
+        if (typeof callback === 'function') callback({ success: true, data: state });
+      } catch (err: any) {
+        socket.emit(SOCKET_EVENTS.SERVER.ROOM_ERROR, { message: err.message });
+        if (typeof callback === 'function') callback({ success: false, error: err.message });
+      }
+    });
+
+    socket.on(
+      SOCKET_EVENTS.CLIENT.TIMER_SKIP,
+      async (data: { roomId: string; targetPhase?: any }, callback) => {
+        try {
+          const state = await TimerService.skipPhase(data.roomId, user.id, data.targetPhase);
+          if (typeof callback === 'function') callback({ success: true, data: state });
+        } catch (err: any) {
+          socket.emit(SOCKET_EVENTS.SERVER.ROOM_ERROR, { message: err.message });
+          if (typeof callback === 'function') callback({ success: false, error: err.message });
+        }
+      }
+    );
+
+    // Collaborative Task events
+    socket.on(SOCKET_EVENTS.CLIENT.TASK_CREATE, async (data: any, callback) => {
+      try {
+        const task = await TaskService.createTask(user.id, data);
+        if (typeof callback === 'function') callback({ success: true, data: task });
+      } catch (err: any) {
+        socket.emit(SOCKET_EVENTS.SERVER.ROOM_ERROR, { message: err.message });
+        if (typeof callback === 'function') callback({ success: false, error: err.message });
+      }
+    });
+
+    socket.on(
+      SOCKET_EVENTS.CLIENT.TASK_UPDATE,
+      async (data: { taskId: string; updates: any }, callback) => {
+        try {
+          const task = await TaskService.updateTask(data.taskId, user.id, data.updates);
+          if (typeof callback === 'function') callback({ success: true, data: task });
+        } catch (err: any) {
+          socket.emit(SOCKET_EVENTS.SERVER.ROOM_ERROR, { message: err.message });
+          if (typeof callback === 'function') callback({ success: false, error: err.message });
+        }
+      }
+    );
+
+    socket.on(SOCKET_EVENTS.CLIENT.TASK_DELETE, async (data: { taskId: string }, callback) => {
+      try {
+        await TaskService.deleteTask(data.taskId, user.id);
+        if (typeof callback === 'function') callback({ success: true });
+      } catch (err: any) {
+        socket.emit(SOCKET_EVENTS.SERVER.ROOM_ERROR, { message: err.message });
+        if (typeof callback === 'function') callback({ success: false, error: err.message });
+      }
+    });
+
+    // Participant heartbeat
+    socket.on(SOCKET_EVENTS.CLIENT.PARTICIPANT_HEARTBEAT, async (data: { roomId: string }) => {
+      if (data?.roomId) {
+        TimerService.registerParticipant(data.roomId, user.id);
+        await prisma.roomMember.updateMany({
+          where: { roomId: data.roomId, userId: user.id },
+          data: { lastActiveAt: new Date() },
+        });
+      }
+    });
+
+    // Room real-time activity/chat
+    socket.on(SOCKET_EVENTS.CLIENT.ROOM_CHAT, async (data: { roomId: string; message: string }) => {
+      if (!data?.roomId || !data?.message?.trim()) return;
+
+      const activity = {
+        id: `chat_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        roomId: data.roomId,
+        userId: user.id,
+        userName: user.name,
+        action: 'CHAT_MESSAGE',
+        details: data.message.trim(),
+        createdAt: new Date().toISOString(),
+      };
+
+      io.to(`room:${data.roomId}`).emit(SOCKET_EVENTS.SERVER.ROOM_ACTIVITY, activity);
+    });
+
+    // Handle disconnect
+    socket.on('disconnect', () => {
+      for (const roomId of socket.data.joinedRooms) {
+        TimerService.unregisterParticipant(roomId, user.id);
+        socket.to(`room:${roomId}`).emit(SOCKET_EVENTS.SERVER.ROOM_PARTICIPANT_LEFT, {
+          userId: user.id,
+          userName: user.name,
+          roomId,
+        });
+      }
+    });
+  });
+
+  return io;
+}
