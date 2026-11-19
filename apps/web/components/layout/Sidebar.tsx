@@ -42,7 +42,7 @@ export const Sidebar: React.FC = () => {
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all duration-150',
                 isActive
-                  ? 'bg-surface-elevated text-accent font-semibold border border-border shadow-sm'
+                  ? 'bg-surface-elevated text-accent font-semibold border border-border shadow-xs'
                   : 'text-foreground-secondary hover:text-foreground hover:bg-surface-subtle'
               )}
             >

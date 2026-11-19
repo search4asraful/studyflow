@@ -136,7 +136,7 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({
                 key={i}
                 className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
                   i < currentCycle
-                    ? 'bg-accent scale-110 shadow-sm'
+                    ? 'bg-accent scale-110 shadow-xs'
                     : 'bg-surface-subtle border border-border'
                 }`}
                 title={`Cycle ${i + 1}`}

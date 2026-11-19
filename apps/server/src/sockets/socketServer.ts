@@ -1,7 +1,7 @@
 import { Server as HttpServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
-import cookie from 'cookie';
+import { parseCookie } from 'cookie';
 import { env } from '../config/env';
 import { prisma } from '../config/prisma';
 import { TimerService } from '../services/timerService';
@@ -53,7 +53,7 @@ export function setupSocketServer(httpServer: HttpServer): SocketIOServer {
       let token: string | undefined = socket.handshake.auth?.token;
 
       if (!token && socket.handshake.headers.cookie) {
-        const parsedCookies = cookie.parse(socket.handshake.headers.cookie);
+        const parsedCookies = parseCookie(socket.handshake.headers.cookie);
         token = parsedCookies.access_token;
       }
 

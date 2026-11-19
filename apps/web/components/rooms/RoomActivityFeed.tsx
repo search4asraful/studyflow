@@ -57,7 +57,7 @@ export const RoomActivityFeed: React.FC<RoomActivityFeedProps> = ({
                     {formatDistanceToNow(new Date(a.createdAt), { addSuffix: true })}
                   </span>
                 </div>
-                <p className="text-xs text-foreground-secondary mt-0.5 break-words">
+                <p className="text-xs text-foreground-secondary mt-0.5 wrap-break-word">
                   {a.details || a.action.replace('_', ' ').toLowerCase()}
                 </p>
               </div>

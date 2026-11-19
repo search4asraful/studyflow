@@ -36,7 +36,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   const nextStatus = currentIndex < statusOrder.length - 1 ? statusOrder[currentIndex + 1] : null;
 
   return (
-    <div className="group card-subtle hover:border-accent/40 rounded-xl p-4 transition-all duration-150 shadow-sm">
+    <div className="group card-subtle hover:border-accent/40 rounded-xl p-4 transition-all duration-150 shadow-xs">
       {/* Priority & Delete header */}
       <div className="flex items-center justify-between mb-2">
         <Badge
@@ -50,7 +50,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           {canDelete && (
             <button
               onClick={() => onDelete(task.id)}
-              className="text-foreground-muted hover:text-red-600 dark:hover:text-red-400 p-1 rounded transition-colors"
+              className="text-foreground-muted hover:text-red-600 dark:hover:text-red-400 p-1 rounded-sm transition-colors"
               title="Delete task"
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -112,7 +112,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
         {prevStatus ? (
           <button
             onClick={() => onUpdateStatus(task.id, prevStatus)}
-            className="flex items-center gap-1 hover:text-accent transition-colors py-0.5 px-1.5 rounded"
+            className="flex items-center gap-1 hover:text-accent transition-colors py-0.5 px-1.5 rounded-sm"
             title={`Move back to ${prevStatus}`}
           >
             <ArrowLeft className="w-3 h-3" />
@@ -123,7 +123,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
         {nextStatus && (
           <button
             onClick={() => onUpdateStatus(task.id, nextStatus)}
-            className="flex items-center gap-1 hover:text-accent transition-colors py-0.5 px-1.5 rounded ml-auto"
+            className="flex items-center gap-1 hover:text-accent transition-colors py-0.5 px-1.5 rounded-sm ml-auto"
             title={`Move to ${nextStatus}`}
           >
             <span className="text-[10px] capitalize">{nextStatus.replace('_', ' ').toLowerCase()}</span>
