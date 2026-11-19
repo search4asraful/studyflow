@@ -78,7 +78,7 @@ describe('Multi-Client Real-Time Concurrency & Synchronization', () => {
 
     // Asraful joins; Shakil should receive participant joined event
     const participantJoinedPromise = new Promise<any>((resolve) => {
-      clientShakil.once(SOCKET_EVENTS.SERVER.ROOM_PARTICIPANT_JOINED, (data) => {
+      clientShakil.once(SOCKET_EVENTS.SERVER.ROOM_PARTICIPANT_JOINED, (data: any) => {
         resolve(data);
       });
     });
