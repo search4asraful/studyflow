@@ -98,7 +98,7 @@ export default function CreditsPage() {
 
         {/* Page Header */}
         <div className="space-y-4">
-          <div className="badge-base bg-surface border border-border px-4 py-1.5 shadow-sm">
+          <div className="badge-base bg-surface border border-border px-4 py-1.5 shadow-xs">
             <GraduationCap className="w-4 h-4 text-accent" />
             <span className="text-xs font-mono uppercase tracking-wider text-foreground-secondary">
               Academic Project Attribution

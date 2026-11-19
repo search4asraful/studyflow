@@ -1,173 +1,260 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
 
-:root,
-.dark,
-[data-theme="dark"] {
-  color-scheme: dark;
+@custom-variant dark (&:is(.dark *));
 
-  /* Primary Palette: #F9F7F7, #DBE2EF, #3F72AF, #112D4E */
-  --bg-canvas: #0E233D;
-  --bg-surface: #112D4E;
-  --bg-elevated: #1B3E69;
-  --bg-subtle: #0A1C32;
+@theme {
+  --color-canvas: var(--bg-canvas);
 
-  --border-base: #1E4575;
-  --border-subtle: rgba(219, 226, 239, 0.15);
-  --border-focus: #3F72AF;
+  --color-surface: var(--bg-surface);
+  --color-surface-elevated: var(--bg-elevated);
+  --color-surface-subtle: var(--bg-subtle);
 
-  --text-primary: #F9F7F7;
-  --text-secondary: #DBE2EF;
-  --text-muted: #8BAACD;
+  --color-border: var(--border-base);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-focus: var(--border-focus);
 
-  --accent-rgb: 63 114 175;
-  --accent: #3F72AF;
-  --accent-hover: #5084C3;
-  --accent-contrast: #FFFFFF;
-  --accent-muted: rgba(63, 114, 175, 0.2);
+  --color-foreground: var(--text-primary);
+  --color-foreground-secondary: var(--text-secondary);
+  --color-foreground-muted: var(--text-muted);
 
-  --scrollbar-thumb: #1E4575;
-  --scrollbar-thumb-hover: #3F72AF;
+  --color-accent: rgb(var(--accent-rgb));
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-contrast: var(--accent-contrast);
+  --color-accent-muted: var(--accent-muted);
 
-  --calendar-picker-filter: invert(1);
+  --color-palette-light: #f9f7f7;
+  --color-palette-ice: #dbe2ef;
+  --color-palette-blue: #3f72af;
+  --color-palette-navy: #112d4e;
+
+  --color-dark-bg: #0e233d;
+  --color-dark-surface: #112d4e;
+  --color-dark-elevated: #1b3e69;
+  --color-dark-border: #1e4575;
+  --color-dark-text-primary: #f9f7f7;
+  --color-dark-text-secondary: #dbe2ef;
+  --color-dark-text-muted: #8baacd;
+  --color-dark-accent: #3f72af;
+  --color-dark-accent-hover: #5084c3;
+
+  --color-light-bg: #f9f7f7;
+  --color-light-surface: #ffffff;
+  --color-light-elevated: #eef3f9;
+  --color-light-border: #dbe2ef;
+  --color-light-text-primary: #112d4e;
+  --color-light-text-secondary: #29476c;
+  --color-light-text-muted: #627d9e;
+  --color-light-accent: #3f72af;
+  --color-light-accent-hover: #325e93;
+
+  --font-sans:
+    var(--font-inter), -apple-system, BlinkMacSystemFont, Segoe UI, Roboto,
+    sans-serif;
+  --font-editorial: var(--font-serif), Georgia, serif;
+  --font-mono: var(--font-mono), monospace;
+
+  --animate-pulse-subtle: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-.light,
-[data-theme="light"] {
-  color-scheme: light;
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
 
-  /* Inverted light theme using the exact palette */
-  --bg-canvas: #F9F7F7;
-  --bg-surface: #FFFFFF;
-  --bg-elevated: #EEF3F9;
-  --bg-subtle: #E4ECF6;
-
-  --border-base: #DBE2EF;
-  --border-subtle: rgba(63, 114, 175, 0.12);
-  --border-focus: #3F72AF;
-
-  --text-primary: #112D4E;
-  --text-secondary: #29476C;
-  --text-muted: #627D9E;
-
-  --accent-rgb: 63 114 175;
-  --accent: #3F72AF;
-  --accent-hover: #325E93;
-  --accent-contrast: #FFFFFF;
-  --accent-muted: rgba(63, 114, 175, 0.14);
-
-  --scrollbar-thumb: #DBE2EF;
-  --scrollbar-thumb-hover: #3F72AF;
-
-  --calendar-picker-filter: none;
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
 }
 
-body {
-  background-color: var(--bg-canvas);
-  color: var(--text-primary);
-  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  transition: background-color 0.2s ease, color 0.2s ease;
-}
-
-/* Custom minimal scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--scrollbar-thumb);
-  border-radius: 9999px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--scrollbar-thumb-hover);
-}
-
-/* Restrained selection styling */
-::selection {
-  background: var(--accent);
-  color: var(--accent-contrast);
-}
-
-/* Form controls theme compatibility */
-select option {
-  background-color: var(--bg-surface);
-  color: var(--text-primary);
-}
-
-input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: var(--calendar-picker-filter);
-  cursor: pointer;
-}
-
-/* Memorable, reusable utility and component classes */
-@layer components {
+@utility card-base {
   /* Cards & Surface Containers */
-  .card-base {
-    @apply bg-surface border border-border rounded-3xl p-6 shadow-sm transition-colors duration-150;
-  }
-  .card-interactive {
-    @apply bg-surface hover:bg-surface-elevated border border-border hover:border-accent rounded-3xl p-6 shadow-sm transition-all duration-150;
-  }
-  .card-elevated {
-    @apply bg-surface-elevated border border-border rounded-3xl p-6 shadow-md transition-colors duration-150;
-  }
-  .card-subtle {
-    @apply bg-surface-subtle border border-border-subtle rounded-2xl p-4 transition-colors duration-150;
-  }
+  @apply bg-surface border border-border rounded-3xl p-6 shadow-xs transition-colors duration-150;
+}
 
+@utility card-interactive {
+  @apply bg-surface hover:bg-surface-elevated border border-border hover:border-accent rounded-3xl p-6 shadow-xs transition-all duration-150;
+}
+
+@utility card-elevated {
+  @apply bg-surface-elevated border border-border rounded-3xl p-6 shadow-md transition-colors duration-150;
+}
+
+@utility card-subtle {
+  @apply bg-surface-subtle border border-border-subtle rounded-2xl p-4 transition-colors duration-150;
+}
+
+@utility input-base {
   /* Form Elements */
-  .input-base {
-    @apply w-full bg-surface-subtle border border-border rounded-xl px-3.5 py-2.5 text-sm text-foreground placeholder:text-foreground-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-colors duration-150;
-  }
+  @apply w-full bg-surface-subtle border border-border rounded-xl px-3.5 py-2.5 text-sm text-foreground placeholder:text-foreground-muted focus:outline-hidden focus:border-accent focus:ring-1 focus:ring-accent transition-colors duration-150;
+}
 
+@utility badge-base {
   /* Badges & Status Pills */
-  .badge-base {
-    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono uppercase tracking-wider transition-colors duration-150;
-  }
-  .badge-accent {
-    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono uppercase tracking-wider bg-accent-muted text-accent border border-accent font-medium;
-  }
-  .badge-neutral {
-    @apply inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium bg-surface-elevated text-foreground-secondary border border-border;
-  }
+  @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono uppercase tracking-wider transition-colors duration-150;
+}
 
+@utility badge-accent {
+  @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono uppercase tracking-wider bg-accent-muted text-accent border border-accent font-medium;
+}
+
+@utility badge-neutral {
+  @apply inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium bg-surface-elevated text-foreground-secondary border border-border;
+}
+
+@utility btn-base {
   /* Buttons */
-  .btn-base {
-    @apply inline-flex items-center justify-center font-medium transition-all duration-200 select-none focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98];
-  }
-  .btn-primary {
-    @apply btn-base bg-accent hover:bg-accent-hover text-white font-semibold shadow-sm;
-  }
-  .btn-secondary {
-    @apply btn-base bg-surface-elevated hover:bg-surface-subtle text-foreground border border-border;
-  }
-  .btn-outline {
-    @apply btn-base border border-border hover:bg-surface-elevated text-foreground;
-  }
-  .btn-ghost {
-    @apply btn-base hover:bg-surface-elevated text-foreground-secondary hover:text-foreground;
+  @apply inline-flex items-center justify-center font-medium transition-all duration-200 select-none focus:outline-hidden focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98];
+}
+
+@utility btn-primary {
+  @apply btn-base bg-accent hover:bg-accent-hover text-white font-semibold shadow-xs;
+}
+
+@utility btn-secondary {
+  @apply btn-base bg-surface-elevated hover:bg-surface-subtle text-foreground border border-border;
+}
+
+@utility btn-outline {
+  @apply btn-base border border-border hover:bg-surface-elevated text-foreground;
+}
+
+@utility btn-ghost {
+  @apply btn-base hover:bg-surface-elevated text-foreground-secondary hover:text-foreground;
+}
+
+@utility heading-page {
+  /* Typography & Layout helpers */
+  @apply text-2xl sm:text-3xl font-bold tracking-tight text-foreground;
+}
+
+@utility subheading-page {
+  @apply text-xs sm:text-sm text-foreground-secondary mt-1;
+}
+
+@utility divider-subtle {
+  @apply border-t border-border-subtle;
+}
+
+@utility page-container {
+  @apply max-w-6xl mx-auto px-6;
+}
+
+@layer utilities {
+  :root,
+  .dark,
+  [data-theme='dark'] {
+    color-scheme: dark;
+
+    /* Primary Palette: #F9F7F7, #DBE2EF, #3F72AF, #112D4E */
+    --bg-canvas: #0e233d;
+    --bg-surface: #112d4e;
+    --bg-elevated: #1b3e69;
+    --bg-subtle: #0a1c32;
+
+    --border-base: #1e4575;
+    --border-subtle: rgba(219, 226, 239, 0.15);
+    --border-focus: #3f72af;
+
+    --text-primary: #f9f7f7;
+    --text-secondary: #dbe2ef;
+    --text-muted: #8baacd;
+
+    --accent-rgb: 63 114 175;
+    --accent: #3f72af;
+    --accent-hover: #5084c3;
+    --accent-contrast: #ffffff;
+    --accent-muted: rgba(63, 114, 175, 0.2);
+
+    --scrollbar-thumb: #1e4575;
+    --scrollbar-thumb-hover: #3f72af;
+
+    --calendar-picker-filter: invert(1);
   }
 
-  /* Typography & Layout helpers */
-  .heading-page {
-    @apply text-2xl sm:text-3xl font-bold tracking-tight text-foreground;
+  .light,
+  [data-theme='light'] {
+    color-scheme: light;
+
+    /* Inverted light theme using the exact palette */
+    --bg-canvas: #f9f7f7;
+    --bg-surface: #ffffff;
+    --bg-elevated: #eef3f9;
+    --bg-subtle: #e4ecf6;
+
+    --border-base: #dbe2ef;
+    --border-subtle: rgba(63, 114, 175, 0.12);
+    --border-focus: #3f72af;
+
+    --text-primary: #112d4e;
+    --text-secondary: #29476c;
+    --text-muted: #627d9e;
+
+    --accent-rgb: 63 114 175;
+    --accent: #3f72af;
+    --accent-hover: #325e93;
+    --accent-contrast: #ffffff;
+    --accent-muted: rgba(63, 114, 175, 0.14);
+
+    --scrollbar-thumb: #dbe2ef;
+    --scrollbar-thumb-hover: #3f72af;
+
+    --calendar-picker-filter: none;
   }
-  .subheading-page {
-    @apply text-xs sm:text-sm text-foreground-secondary mt-1;
+
+  body {
+    background-color: var(--bg-canvas);
+    color: var(--text-primary);
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition:
+      background-color 0.2s ease,
+      color 0.2s ease;
   }
-  .divider-subtle {
-    @apply border-t border-border-subtle;
+
+  /* Custom minimal scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
   }
-  .page-container {
-    @apply max-w-6xl mx-auto px-6;
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
   }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+  }
+
+  /* Restrained selection styling */
+  ::selection {
+    background: var(--accent);
+    color: var(--accent-contrast);
+  }
+
+  /* Form controls theme compatibility */
+  select option {
+    background-color: var(--bg-surface);
+    color: var(--text-primary);
+  }
+
+  input[type='date']::-webkit-calendar-picker-indicator {
+    filter: var(--calendar-picker-filter);
+    cursor: pointer;
+  }
+
+  /* Memorable, reusable utility and component classes */
 }

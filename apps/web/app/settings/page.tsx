@@ -119,7 +119,7 @@ export default function SettingsPage() {
                   </div>
                   {mounted && theme === 'dark' && (
                     <span className="w-5 h-5 rounded-full bg-accent text-white flex items-center justify-center">
-                      <Check className="w-3 h-3 stroke-[3]" />
+                      <Check className="w-3 h-3 stroke-3" />
                     </span>
                   )}
                 </div>
@@ -151,7 +151,7 @@ export default function SettingsPage() {
                   </div>
                   {mounted && theme === 'light' && (
                     <span className="w-5 h-5 rounded-full bg-accent text-white flex items-center justify-center">
-                      <Check className="w-3 h-3 stroke-[3]" />
+                      <Check className="w-3 h-3 stroke-3" />
                     </span>
                   )}
                 </div>
@@ -216,7 +216,7 @@ export default function SettingsPage() {
                     type="checkbox"
                     checked={soundEnabled}
                     onChange={(e) => setSoundEnabled(e.target.checked)}
-                    className="h-4 w-4 rounded border-border bg-surface-subtle text-accent focus:ring-accent"
+                    className="h-4 w-4 rounded-sm border-border bg-surface-subtle text-accent focus:ring-accent"
                   />
                   <span className="text-xs text-foreground">
                     Play audio chime on Pomodoro phase transitions

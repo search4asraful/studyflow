@@ -15,14 +15,15 @@ import Link from 'next/link';
 const createRoomSchema = z.object({
   name: z.string().min(3, 'Room name must be at least 3 characters').max(50),
   description: z.string().max(300).optional(),
-  isPrivate: z.boolean().default(false),
-  focusMinutes: z.coerce.number().min(1).max(120).default(25),
-  shortBreakMinutes: z.coerce.number().min(1).max(30).default(5),
-  longBreakMinutes: z.coerce.number().min(1).max(60).default(15),
-  cyclesBeforeLongBreak: z.coerce.number().min(1).max(12).default(4),
+  isPrivate: z.boolean(),
+  focusMinutes: z.coerce.number().min(1).max(120),
+  shortBreakMinutes: z.coerce.number().min(1).max(30),
+  longBreakMinutes: z.coerce.number().min(1).max(60),
+  cyclesBeforeLongBreak: z.coerce.number().min(1).max(12),
 });
 
-type CreateRoomFormData = z.infer<typeof createRoomSchema>;
+type CreateRoomInput = z.input<typeof createRoomSchema>;
+type CreateRoomOutput = z.output<typeof createRoomSchema>;
 
 export default function CreateRoomPage() {
   const router = useRouter();
@@ -31,7 +32,7 @@ export default function CreateRoomPage() {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<CreateRoomFormData>({
+  } = useForm<CreateRoomInput, any, CreateRoomOutput>({
     resolver: zodResolver(createRoomSchema),
     defaultValues: {
       name: '',
@@ -44,7 +45,7 @@ export default function CreateRoomPage() {
     },
   });
 
-  const onSubmit = async (data: CreateRoomFormData) => {
+  const onSubmit = async (data: CreateRoomOutput) => {
     try {
       const payload = {
         name: data.name,
@@ -151,7 +152,7 @@ export default function CreateRoomPage() {
                 <input
                   type="checkbox"
                   {...register('isPrivate')}
-                  className="mt-1 h-4 w-4 rounded border-border bg-surface-subtle text-accent focus:ring-accent"
+                  className="mt-1 h-4 w-4 rounded-sm border-border bg-surface-subtle text-accent focus:ring-accent"
                 />
                 <div>
                   <span className="text-xs font-semibold text-foreground block">

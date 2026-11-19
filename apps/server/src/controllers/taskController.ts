@@ -13,7 +13,7 @@ export class TaskController {
 
   static async updateTask(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
+      const id = req.params.id as string;
       const task = await TaskService.updateTask(id, req.user!.id, req.body);
       res.status(200).json({ success: true, data: task });
     } catch (error) {
@@ -23,7 +23,7 @@ export class TaskController {
 
   static async deleteTask(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
+      const id = req.params.id as string;
       await TaskService.deleteTask(id, req.user!.id);
       res.status(200).json({ success: true, message: 'Task deleted successfully' });
     } catch (error) {

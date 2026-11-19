@@ -75,7 +75,7 @@ export const LandingHero: React.FC = () => {
 
       <div className="max-w-6xl mx-auto px-6 text-center">
         {/* Product Status Badge */}
-        <div className="hero-badge badge-base bg-surface border border-border px-4 py-1.5 mb-8 shadow-sm">
+        <div className="hero-badge badge-base bg-surface border border-border px-4 py-1.5 mb-8 shadow-xs">
           <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
           <span className="text-xs font-mono uppercase tracking-wider text-foreground-secondary">
             Authoritative Real-Time Collaborative Study Platform
@@ -157,7 +157,7 @@ export const LandingHero: React.FC = () => {
                       Configure PostgreSQL schema & relations
                     </span>
                   </div>
-                  <span className="text-[10px] bg-surface-elevated text-foreground-secondary border border-border px-2 py-0.5 rounded">
+                  <span className="text-[10px] bg-surface-elevated text-foreground-secondary border border-border px-2 py-0.5 rounded-sm">
                     Done
                   </span>
                 </div>
@@ -169,7 +169,7 @@ export const LandingHero: React.FC = () => {
                       Authoritative group Pomodoro timer synchronization
                     </span>
                   </div>
-                  <span className="text-[10px] bg-accent-muted text-accent font-medium px-2 py-0.5 rounded border border-accent/20">
+                  <span className="text-[10px] bg-accent-muted text-accent font-medium px-2 py-0.5 rounded-sm border border-accent/20">
                     In Progress
                   </span>
                 </div>
@@ -181,7 +181,7 @@ export const LandingHero: React.FC = () => {
                       Multi-client concurrency & WebSocket reconnection
                     </span>
                   </div>
-                  <span className="text-[10px] bg-surface-elevated text-foreground-muted px-2 py-0.5 rounded border border-border">
+                  <span className="text-[10px] bg-surface-elevated text-foreground-muted px-2 py-0.5 rounded-sm border border-border">
                     To Do
                   </span>
                 </div>

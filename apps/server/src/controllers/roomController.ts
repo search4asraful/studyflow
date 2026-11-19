@@ -23,7 +23,7 @@ export class RoomController {
 
   static async getRoomDetails(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
+      const id = req.params.id as string;
       const details = await RoomService.getRoomDetails(id, req.user!.id);
       res.status(200).json({ success: true, data: details });
     } catch (error) {
@@ -43,7 +43,7 @@ export class RoomController {
 
   static async leaveRoom(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
+      const id = req.params.id as string;
       await RoomService.leaveRoom(id, req.user!.id);
       res.status(200).json({ success: true, message: 'Left room successfully' });
     } catch (error) {
@@ -53,7 +53,7 @@ export class RoomController {
 
   static async updateRoom(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
+      const id = req.params.id as string;
       const room = await RoomService.updateRoom(id, req.user!.id, req.body);
       res.status(200).json({ success: true, data: room });
     } catch (error) {
@@ -63,7 +63,7 @@ export class RoomController {
 
   static async deleteRoom(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
+      const id = req.params.id as string;
       await RoomService.deleteRoom(id, req.user!.id);
       res.status(200).json({ success: true, message: 'Room deleted' });
     } catch (error) {
@@ -73,7 +73,7 @@ export class RoomController {
 
   static async startTimer(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
+      const id = req.params.id as string;
       const timerState = await TimerService.startTimer(id, req.user!.id);
       res.status(200).json({ success: true, data: timerState });
     } catch (error) {
@@ -83,7 +83,7 @@ export class RoomController {
 
   static async pauseTimer(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
+      const id = req.params.id as string;
       const timerState = await TimerService.pauseTimer(id, req.user!.id);
       res.status(200).json({ success: true, data: timerState });
     } catch (error) {
@@ -93,7 +93,7 @@ export class RoomController {
 
   static async resumeTimer(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
+      const id = req.params.id as string;
       const timerState = await TimerService.resumeTimer(id, req.user!.id);
       res.status(200).json({ success: true, data: timerState });
     } catch (error) {
@@ -103,7 +103,7 @@ export class RoomController {
 
   static async skipPhase(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
+      const id = req.params.id as string;
       const { targetPhase } = req.body;
       const timerState = await TimerService.skipPhase(id, req.user!.id, targetPhase);
       res.status(200).json({ success: true, data: timerState });

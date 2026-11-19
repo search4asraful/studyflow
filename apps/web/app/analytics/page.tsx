@@ -159,7 +159,7 @@ export default function AnalyticsPage() {
                         }}
                         labelStyle={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: '2px' }}
                         itemStyle={{ color: 'var(--text-secondary)' }}
-                        formatter={(val: number) => [`${val} minutes`, 'Focus Time']}
+                        formatter={(val: any) => [`${val} minutes`, 'Focus Time']}
                       />
                       <Area
                         type="monotone"
@@ -248,7 +248,7 @@ export default function AnalyticsPage() {
                           }}
                           labelStyle={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: '2px' }}
                           itemStyle={{ color: 'var(--text-secondary)' }}
-                          formatter={(val: number) => [`${val} minutes`, 'Duration']}
+                          formatter={(val: any) => [`${val} minutes`, 'Duration']}
                         />
                       </PieChart>
                     </ResponsiveContainer>

@@ -195,7 +195,7 @@ export default function DashboardPage() {
                     }}
                     labelStyle={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: '2px' }}
                     itemStyle={{ color: 'var(--text-secondary)' }}
-                    formatter={(val: number) => [`${val} minutes`, 'Focus Time']}
+                    formatter={(val: any) => [`${val} minutes`, 'Focus Time']}
                   />
                   <Bar dataKey="focusMinutes" fill="var(--accent)" radius={[6, 6, 0, 0]} />
                 </BarChart>
@@ -285,7 +285,7 @@ export default function DashboardPage() {
                   >
                     <div className="flex items-center gap-2.5 flex-1 min-w-0 pr-2">
                       <span
-                        className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                        className={`w-2 h-2 rounded-full shrink-0 ${
                           task.status === 'COMPLETED'
                             ? 'bg-emerald-600 dark:bg-emerald-400'
                             : task.status === 'IN_PROGRESS'
