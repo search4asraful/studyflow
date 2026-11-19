@@ -1,3 +1,11 @@
+import dotenv from 'dotenv';
+import path from 'path';
+
+// Load local or root .env
+dotenv.config();
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+
 import { PrismaClient, RoomRole, TimerPhase, TimerStatus, TaskStatus, TaskPriority } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { subDays, startOfDay, addHours } from 'date-fns';
