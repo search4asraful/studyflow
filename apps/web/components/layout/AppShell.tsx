@@ -49,18 +49,20 @@ export const AppShell: React.FC<AppShellProps> = ({ children, fullWidth = false 
 
   return (
     <div className="min-h-screen bg-canvas text-foreground flex flex-col transition-colors duration-200">
-      <Navbar />
+      <Navbar variant="admin" />
       <div className="flex-1 flex">
         <Sidebar />
-        <main
-          className={
-            fullWidth
-              ? 'flex-1 p-3 sm:p-4 md:p-6 pb-20 md:pb-6 w-full flex flex-col'
-              : 'flex-1 p-4 sm:p-6 md:p-8 pb-20 md:pb-8 max-w-7xl mx-auto w-full overflow-x-hidden'
-          }
-        >
-          {children}
-        </main>
+        <div className="flex-1 md:pl-64 flex flex-col min-w-0">
+          <main
+            className={
+              fullWidth
+                ? 'flex-1 p-3 sm:p-4 md:p-6 pb-20 md:pb-6 w-full flex flex-col'
+                : 'flex-1 p-4 sm:p-6 md:p-8 pb-20 md:pb-8 max-w-7xl mx-auto w-full overflow-x-hidden'
+            }
+          >
+            {children}
+          </main>
+        </div>
       </div>
       <MobileNav />
     </div>

@@ -11,11 +11,14 @@ import {
   Settings,
   Sparkles,
   Plus,
+  LogOut,
 } from 'lucide-react';
+import { useAuthStore } from '../../stores/authStore';
 import { cn } from '../../lib/utils';
 
 export const Sidebar: React.FC = () => {
   const pathname = usePathname();
+  const logout = useAuthStore((s) => s.logout);
 
   const links = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -26,7 +29,7 @@ export const Sidebar: React.FC = () => {
   ];
 
   return (
-    <aside className="w-64 border-r border-border bg-surface/90 backdrop-blur-md hidden md:flex flex-col justify-between p-4 min-h-[calc(100vh-64px)] transition-colors duration-200">
+    <aside className="w-64 border-r border-border bg-surface/95 backdrop-blur-md hidden md:flex flex-col justify-between p-4 fixed top-16 left-0 bottom-0 z-30 transition-colors duration-200 overflow-y-auto">
       <div className="space-y-4">
         {/* Navigation Section */}
         <div>
@@ -70,40 +73,54 @@ export const Sidebar: React.FC = () => {
         </div>
 
         {/* Quick Room Action */}
-        <div className="px-2">
+        <div className="px-1 pt-1">
           <Link
             href="/rooms/create"
-            className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-surface-elevated hover:bg-surface-subtle border border-border hover:border-accent/40 text-xs font-medium text-foreground transition-all shadow-2xs group"
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-accent hover:bg-accent-hover text-white text-xs font-semibold shadow-md shadow-accent/25 hover:shadow-lg hover:shadow-accent/35 transition-all group active:scale-[0.98]"
           >
-            <Plus className="w-3.5 h-3.5 text-accent group-hover:rotate-90 transition-transform duration-200" />
-            <span>Launch New Room</span>
+            <Plus className="w-4 h-4 text-white group-hover:rotate-90 transition-transform duration-200" />
+            <span>New Room</span>
           </Link>
         </div>
       </div>
 
-      {/* Attribution Card */}
-      <div className="card-subtle space-y-2.5 border-accent/20">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
-            <Sparkles className="w-4 h-4 text-accent" />
-            <span>StudyFlow Workspace</span>
+      {/* Bottom Section: Attribution & Sign Out */}
+      <div className="space-y-3 pt-3 border-t border-border/80">
+        {/* Attribution Card */}
+        <div className="card-subtle space-y-2 p-3 border-accent/20 bg-surface-subtle/50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
+              <Sparkles className="w-3.5 h-3.5 text-accent" />
+              <span>StudyFlow Workspace</span>
+            </div>
+            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-sm bg-accent/15 text-accent border border-accent/30 font-semibold">
+              v1.2
+            </span>
           </div>
-          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-sm bg-accent/15 text-accent border border-accent/30 font-semibold">
-            v1.2
-          </span>
+          <p className="text-[11px] text-foreground-muted leading-relaxed">
+            Real-time synchronized Pomodoro with sub-50ms latency.
+          </p>
+          <div className="text-[10px] text-foreground-secondary pt-1 flex items-center justify-between">
+            <Link href="/credits" className="hover:text-accent font-medium transition-colors">
+              Specs &amp; Team
+            </Link>
+            <span className="text-emerald-400 font-mono text-[10px] flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              Active
+            </span>
+          </div>
         </div>
-        <p className="text-[11px] text-foreground-muted leading-relaxed">
-          Authoritative real-time synchronized Pomodoro with sub-50ms latency.
-        </p>
-        <div className="text-[10px] text-foreground-secondary pt-1.5 flex items-center justify-between">
-          <Link href="/credits" className="hover:text-accent font-medium transition-colors">
-            Team &amp; Specifications
-          </Link>
-          <span className="text-emerald-400 font-mono text-[10px] flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            Active
-          </span>
-        </div>
+
+        {/* Sign Out Button */}
+        <button
+          onClick={() => logout()}
+          className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-medium text-red-500 hover:text-red-600 hover:bg-red-500/10 border border-red-500/20 hover:border-red-500/30 transition-all cursor-pointer shadow-2xs group"
+          title="Sign out of StudyFlow"
+          type="button"
+        >
+          <LogOut className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5" />
+          <span>Sign Out</span>
+        </button>
       </div>
     </aside>
   );
