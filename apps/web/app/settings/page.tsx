@@ -1,32 +1,67 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppShell } from '../../components/layout/AppShell';
 import { useAuthStore } from '../../stores/authStore';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { apiRequest } from '../../lib/api';
 import { toast } from 'sonner';
-import { User, Shield, Palette, Sun, Moon, Check } from 'lucide-react';
-import { useTheme } from '../../hooks/useTheme';
+import {
+  User,
+  Shield,
+  Volume2,
+  VolumeX,
+  Play,
+  CheckCircle2,
+} from 'lucide-react';
+import {
+  getTaskAudioSettings,
+  saveTaskAudioSettings,
+  playTaskCompletionSound,
+  TaskSoundStyle,
+  TaskAudioSettings,
+  DEFAULT_TASK_AUDIO_SETTINGS,
+} from '../../lib/audio';
+import { cn, formatMinutes } from '../../lib/utils';
 
 export default function SettingsPage() {
   const user = useAuthStore((s) => s.user);
   const profile = useAuthStore((s) => s.profile);
   const setUser = useAuthStore((s) => s.setUser);
-  const { theme, setTheme, mounted } = useTheme();
 
   // Profile Form state
   const [name, setName] = useState(user?.name || '');
   const [bio, setBio] = useState(user?.bio || '');
   const [dailyGoal, setDailyGoal] = useState(profile?.dailyGoalMinutes || 120);
-  const [soundEnabled, setSoundEnabled] = useState(profile?.soundEnabled ?? true);
   const [savingProfile, setSavingProfile] = useState(false);
+
+  // Task Audio Settings state
+  const [taskAudio, setTaskAudio] = useState<TaskAudioSettings>(DEFAULT_TASK_AUDIO_SETTINGS);
 
   // Password Change state
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
+
+  // Load saved task audio settings on mount
+  useEffect(() => {
+    setTaskAudio(getTaskAudioSettings());
+  }, []);
+
+  const handleToggleMute = () => {
+    const nextEnabled = !taskAudio.enabled;
+    const updated = saveTaskAudioSettings({ enabled: nextEnabled });
+    setTaskAudio(updated);
+    toast.success(nextEnabled ? 'Task completion sound unmuted' : 'Task completion sound muted');
+  };
+
+  const handleSelectStyle = (style: TaskSoundStyle) => {
+    const updated = saveTaskAudioSettings({ style });
+    setTaskAudio(updated);
+    playTaskCompletionSound(style, true);
+    toast.success(`Task sound set to ${style.charAt(0).toUpperCase() + style.slice(1)}`);
+  };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,8 +73,7 @@ export default function SettingsPage() {
           name,
           bio,
           dailyGoalMinutes: Number(dailyGoal),
-          soundEnabled,
-          themePreference: theme,
+          soundEnabled: taskAudio.enabled,
         }),
       });
       setUser(res.user, res.profile);
@@ -74,107 +108,99 @@ export default function SettingsPage() {
   return (
     <AppShell>
       <div className="max-w-3xl mx-auto space-y-8">
-        <div className="pb-6 divider-subtle">
-          <h1 className="heading-page">
-            Settings &amp; Profile
-          </h1>
+        <div>
+          <h1 className="heading-page">Settings &amp; Preferences</h1>
           <p className="subheading-page">
-            Manage your personal profile, color theme, notification sounds, and security credentials.
+            Customize your task completion sound, daily focus goals, and security credentials.
           </p>
         </div>
 
-        {/* Appearance & Color Theme */}
-        <div className="card-base p-7">
-          <div className="flex items-center gap-2 mb-6 pb-4 divider-subtle">
-            <Palette className="w-4 h-4 text-accent" />
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-foreground">
-              Appearance &amp; Theme System
-            </h2>
+        {/* Task Completion Sound Card */}
+        <div className="card-elevated p-6 sm:p-7 space-y-5 border-accent/25">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1">
+            <div>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-accent" />
+                <h2 className="text-sm font-bold uppercase tracking-wider text-foreground">
+                  Task Completion Sound
+                </h2>
+              </div>
+              <p className="text-xs text-foreground-secondary mt-1">
+                Synthesized Web Audio cue played whenever a collaborative task is completed.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleToggleMute}
+              className={cn(
+                'inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl border text-xs font-semibold cursor-pointer transition-all shrink-0 self-start sm:self-auto shadow-2xs',
+                taskAudio.enabled
+                  ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
+                  : 'bg-rose-500/15 text-rose-400 border-rose-500/30 hover:bg-rose-500/25'
+              )}
+              title={taskAudio.enabled ? 'Click to mute sound' : 'Click to unmute sound'}
+            >
+              {taskAudio.enabled ? (
+                <>
+                  <Volume2 className="w-4 h-4" />
+                  <span>Sound Active</span>
+                </>
+              ) : (
+                <>
+                  <VolumeX className="w-4 h-4" />
+                  <span>Sound Muted</span>
+                </>
+              )}
+            </button>
           </div>
 
-          <div className="space-y-4">
-            <p className="text-xs text-foreground-secondary leading-relaxed">
-              Choose your interface theme. Colors are dynamically driven by global CSS variables utilizing
-              our template palette: <span className="font-mono text-foreground font-semibold">#F9F7F7</span>,{' '}
-              <span className="font-mono text-foreground font-semibold">#DBE2EF</span>,{' '}
-              <span className="font-mono text-foreground font-semibold">#3F72AF</span>, and{' '}
-              <span className="font-mono text-foreground font-semibold">#112D4E</span>.
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-              {/* Dark Theme Option */}
-              <button
-                type="button"
-                onClick={() => setTheme('dark')}
-                className={`text-left p-4 rounded-2xl border transition-all duration-150 flex flex-col justify-between ${
-                  mounted && theme === 'dark'
-                    ? 'border-accent bg-surface-elevated ring-1 ring-accent'
-                    : 'border-border bg-surface-subtle hover:border-border/80'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Moon className="w-4 h-4 text-accent" />
-                    <span className="text-sm font-semibold text-foreground">Midnight Navy</span>
-                  </div>
-                  {mounted && theme === 'dark' && (
-                    <span className="w-5 h-5 rounded-full bg-accent text-white flex items-center justify-center">
-                      <Check className="w-3 h-3 stroke-3" />
-                    </span>
+          <div className="space-y-3">
+            <span className="text-xs font-medium text-foreground-secondary block">
+              Choose Sound Style
+            </span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { id: 'fanfare' as const, name: 'Uplifting Fanfare', desc: 'Ascending major chord' },
+                { id: 'success' as const, name: 'Joyful Chime', desc: 'Bright 2-note resolution' },
+                { id: 'levelup' as const, name: 'Level Up', desc: 'Arcade sparkle arpeggio' },
+                { id: 'crystal' as const, name: 'Crystal Bell', desc: 'Harmonic crystal bell' },
+              ].map((style) => (
+                <button
+                  key={style.id}
+                  type="button"
+                  onClick={() => handleSelectStyle(style.id)}
+                  className={cn(
+                    'p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between group cursor-pointer',
+                    taskAudio.style === style.id
+                      ? 'border-accent bg-accent/15 ring-1 ring-accent'
+                      : 'border-border bg-surface-subtle hover:border-accent/40'
                   )}
-                </div>
-                <p className="text-xs text-foreground-secondary mb-3">
-                  Deep midnight navy canvas with royal blue accents and crisp light typography.
-                </p>
-                <div className="flex items-center gap-1.5 pt-2 border-t border-border-subtle">
-                  <div className="w-4 h-4 rounded-full border border-border" style={{ backgroundColor: '#112D4E' }} title="#112D4E" />
-                  <div className="w-4 h-4 rounded-full border border-border" style={{ backgroundColor: '#1E4575' }} title="#1E4575" />
-                  <div className="w-4 h-4 rounded-full border border-border" style={{ backgroundColor: '#3F72AF' }} title="#3F72AF" />
-                  <div className="w-4 h-4 rounded-full border border-border" style={{ backgroundColor: '#F9F7F7' }} title="#F9F7F7" />
-                </div>
-              </button>
-
-              {/* Light Theme Option */}
-              <button
-                type="button"
-                onClick={() => setTheme('light')}
-                className={`text-left p-4 rounded-2xl border transition-all duration-150 flex flex-col justify-between ${
-                  mounted && theme === 'light'
-                    ? 'border-accent bg-surface-elevated ring-1 ring-accent'
-                    : 'border-border bg-surface-subtle hover:border-border/80'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Sun className="w-4 h-4 text-accent" />
-                    <span className="text-sm font-semibold text-foreground">Ice Blue &amp; White</span>
-                  </div>
-                  {mounted && theme === 'light' && (
-                    <span className="w-5 h-5 rounded-full bg-accent text-white flex items-center justify-center">
-                      <Check className="w-3 h-3 stroke-3" />
+                >
+                  <div>
+                    <span className="text-xs font-semibold text-foreground block group-hover:text-accent transition-colors">
+                      {style.name}
                     </span>
-                  )}
-                </div>
-                <p className="text-xs text-foreground-secondary mb-3">
-                  Clean light canvas with white cards, soft ice blue borders, and navy typography.
-                </p>
-                <div className="flex items-center gap-1.5 pt-2 border-t border-border-subtle">
-                  <div className="w-4 h-4 rounded-full border border-border" style={{ backgroundColor: '#F9F7F7' }} title="#F9F7F7" />
-                  <div className="w-4 h-4 rounded-full border border-border" style={{ backgroundColor: '#FFFFFF' }} title="#FFFFFF" />
-                  <div className="w-4 h-4 rounded-full border border-border" style={{ backgroundColor: '#DBE2EF' }} title="#DBE2EF" />
-                  <div className="w-4 h-4 rounded-full border border-border" style={{ backgroundColor: '#112D4E' }} title="#112D4E" />
-                </div>
-              </button>
+                    <span className="text-[10px] text-foreground-muted block mt-0.5">
+                      {style.desc}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 text-[10px] text-accent mt-3 font-semibold">
+                    <Play className="w-2.5 h-2.5 fill-current" />
+                    <span>Audition</span>
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
         </div>
 
         {/* Profile Card */}
-        <div className="card-base p-7">
-          <div className="flex items-center gap-2 mb-6 pb-4 divider-subtle">
+        <div className="card-base p-6 sm:p-7">
+          <div className="flex items-center gap-2 mb-4">
             <User className="w-4 h-4 text-accent" />
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-foreground">
-              Public Profile &amp; Preferences
+            <h2 className="text-sm font-bold uppercase tracking-wider text-foreground">
+              Public Profile &amp; Goals
             </h2>
           </div>
 
@@ -197,36 +223,35 @@ export default function SettingsPage() {
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-              <Input
-                label="Daily Focus Target (Minutes)"
-                type="number"
+            {/* Daily Goal with Live Time Converter */}
+            <div className="space-y-2 pt-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-medium text-foreground-secondary">
+                  Daily Focus Target
+                </label>
+                <span className="text-xs font-mono font-bold text-accent">
+                  {formatMinutes(dailyGoal)} ({dailyGoal} mins)
+                </span>
+              </div>
+              <input
+                type="range"
+                min="15"
+                max="480"
+                step="15"
                 value={dailyGoal}
                 onChange={(e) => setDailyGoal(Number(e.target.value))}
-                min={10}
-                max={1440}
+                className="w-full h-2 bg-surface-subtle rounded-lg appearance-none cursor-pointer accent-accent"
               />
-
-              <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-foreground-secondary">
-                  Acoustic Chime
-                </label>
-                <label className="flex items-center gap-2.5 mt-2.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={soundEnabled}
-                    onChange={(e) => setSoundEnabled(e.target.checked)}
-                    className="h-4 w-4 rounded-sm border-border bg-surface-subtle text-accent focus:ring-accent"
-                  />
-                  <span className="text-xs text-foreground">
-                    Play audio chime on Pomodoro phase transitions
-                  </span>
-                </label>
+              <div className="flex justify-between text-[10px] font-mono text-foreground-muted">
+                <span>15m</span>
+                <span>2h (120m)</span>
+                <span>4h (240m)</span>
+                <span>8h (480m)</span>
               </div>
             </div>
 
             <div className="pt-4 flex justify-end">
-              <Button type="submit" variant="primary" size="md" isLoading={savingProfile}>
+              <Button type="submit" variant="primary" size="md" isLoading={savingProfile} className="px-6 font-semibold shadow-md shadow-accent/25">
                 Save Preferences
               </Button>
             </div>
@@ -234,10 +259,10 @@ export default function SettingsPage() {
         </div>
 
         {/* Security / Password Change */}
-        <div className="card-base p-7">
-          <div className="flex items-center gap-2 mb-6 pb-4 divider-subtle">
+        <div className="card-base p-6 sm:p-7">
+          <div className="flex items-center gap-2 mb-4">
             <Shield className="w-4 h-4 text-accent" />
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-foreground">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-foreground">
               Security &amp; Credentials
             </h2>
           </div>
@@ -262,7 +287,7 @@ export default function SettingsPage() {
             />
 
             <div className="pt-2 flex justify-end">
-              <Button type="submit" variant="secondary" size="md" isLoading={changingPassword}>
+              <Button type="submit" variant="secondary" size="md" isLoading={changingPassword} className="px-6">
                 Update Password
               </Button>
             </div>

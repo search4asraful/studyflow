@@ -1,6 +1,7 @@
 import { prisma } from '../config/prisma';
 import { CreateTaskInput, UpdateTaskInput, Task, SOCKET_EVENTS } from '../shared';
 import { ForbiddenError, NotFoundError } from '../utils/errors';
+import { RoomActivityService } from './activityMemory';
 import { RoomRole, TaskStatus } from '@prisma/client';
 import type { Server as SocketIOServer } from 'socket.io';
 
@@ -89,23 +90,12 @@ export class TaskService {
       },
     });
 
-    // Log activities
-    await prisma.taskActivity.create({
-      data: {
-        taskId: task.id,
-        userId,
-        action: 'CREATED',
-        details: { title: task.title, status: task.status },
-      },
-    });
-
-    await prisma.roomActivity.create({
-      data: {
-        roomId: input.roomId,
-        userId,
-        action: 'TASK_CREATED',
-        details: `${membership.user.name} added task: "${task.title}"`,
-      },
+    // Broadcast live ephemeral room activity via socket (zero database writes)
+    RoomActivityService.broadcastActivity(input.roomId, {
+      userId,
+      userName: membership.user.name,
+      action: 'TASK_CREATED',
+      details: `${membership.user.name} added task: "${task.title}"`,
     });
 
     const formatted = this.formatTask(task);
@@ -180,23 +170,12 @@ export class TaskService {
 
     // Check if status changed
     if (input.status && input.status !== oldStatus) {
-      await prisma.taskActivity.create({
-        data: {
-          taskId,
-          userId,
-          action: 'STATUS_CHANGED',
-          details: { from: oldStatus, to: input.status },
-        },
-      });
-
-      const user = await prisma.user.findUnique({ where: { id: userId } });
-      await prisma.roomActivity.create({
-        data: {
-          roomId: existing.roomId,
-          userId,
-          action: input.status === 'COMPLETED' ? 'TASK_COMPLETED' : 'TASK_STATUS_CHANGED',
-          details: `${user?.name || 'User'} moved "${updated.title}" to ${input.status}`,
-        },
+      const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+      RoomActivityService.broadcastActivity(existing.roomId, {
+        userId,
+        userName: user?.name || 'Member',
+        action: input.status === 'COMPLETED' ? 'TASK_COMPLETED' : 'TASK_STATUS_CHANGED',
+        details: `${user?.name || 'Member'} moved "${updated.title}" to ${input.status.replace('_', ' ')}`,
       });
     }
 
@@ -251,7 +230,15 @@ export class TaskService {
       where: { id: taskId },
     });
 
-    // Broadcast deletion
+    // Broadcast deletion and activity via socket
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+    RoomActivityService.broadcastActivity(existing.roomId, {
+      userId,
+      userName: user?.name || 'Member',
+      action: 'TASK_DELETED',
+      details: `${user?.name || 'Member'} deleted task "${existing.title}"`,
+    });
+
     if (this.io) {
       this.io.to(`room:${existing.roomId}`).emit(SOCKET_EVENTS.SERVER.TASK_DELETED, {
         id: taskId,

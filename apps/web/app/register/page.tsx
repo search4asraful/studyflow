@@ -1,16 +1,18 @@
 'use client';
 
+import { zodResolver } from '@hookform/resolvers/zod';
+import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { Input } from '../../components/ui/Input';
-import { Button } from '../../components/ui/Button';
-import { ThemeToggle } from '../../components/ui/ThemeToggle';
-import { useAuthStore } from '../../stores/authStore';
-import { apiRequest } from '../../lib/api';
 import { toast } from 'sonner';
+import { z } from 'zod';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
+import { ThemeToggle } from '../../components/ui/ThemeToggle';
+import { apiRequest } from '../../lib/api';
+import { triggerConfetti } from '../../lib/confetti';
+import { useAuthStore } from '../../stores/authStore';
 
 const registerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(50),
@@ -40,6 +42,7 @@ export default function RegisterPage() {
         body: JSON.stringify(data),
       });
       setUser(res.user);
+      triggerConfetti();
       toast.success(`Account created! Welcome to StudyFlow, ${res.user.name}.`);
       router.push('/dashboard');
     } catch (err: any) {
@@ -48,30 +51,41 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-canvas flex flex-col justify-center items-center px-4 py-12 relative transition-colors duration-200">
-      <div className="absolute top-6 right-6">
+    <div className="min-h-screen bg-canvas flex flex-col justify-center items-center px-4 py-12 relative transition-colors duration-200 overflow-hidden">
+      {/* Background ambient radial glow */}
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-accent/15 rounded-full blur-[140px] pointer-events-none" />
+
+      {/* Top Controls */}
+      <div className="absolute top-6 left-6 right-6 flex items-center justify-between">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 text-xs text-foreground-secondary hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Home
+        </Link>
         <ThemeToggle />
       </div>
 
-      <Link href="/" className="flex items-center gap-2.5 mb-8 group">
-        <div className="w-9 h-9 rounded-xl bg-accent text-white flex items-center justify-center font-bold text-base shadow-md group-hover:scale-105 transition-transform">
+      <Link href="/" className="flex items-center gap-2.5 mb-8 group relative z-10">
+        <div className="w-10 h-10 rounded-2xl bg-linear-to-tr from-accent via-blue-500 to-sky-400 text-white flex items-center justify-center font-bold text-base shadow-lg shadow-accent/25 group-hover:scale-105 transition-all">
           SF
         </div>
-        <span className="font-bold text-xl tracking-tight text-foreground">StudyFlow</span>
+        <span className="font-bold text-2xl tracking-tight text-foreground">StudyFlow</span>
       </Link>
 
-      <div className="w-full max-w-md card-elevated p-8 shadow-xl">
+      <div className="w-full max-w-md card-elevated p-8 shadow-2xl relative z-10 border-accent/25">
         <div className="mb-6">
-          <h2 className="text-xl font-bold text-foreground tracking-tight">Create your account</h2>
+          <h2 className="text-2xl font-bold text-foreground tracking-tight">Create your account</h2>
           <p className="text-xs text-foreground-secondary mt-1">
-            Join group study sessions and start tracking shared focus time.
+            Join group study sessions and start tracking shared focus time with zero clock drift.
           </p>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Input
             label="Full Name"
-            placeholder="Md. Asraful Islam"
+            placeholder="e.g. Asraful Islam"
             {...register('name')}
             error={errors.name?.message}
           />
@@ -79,7 +93,7 @@ export default function RegisterPage() {
           <Input
             label="Email address"
             type="email"
-            placeholder="asraful@university.edu"
+            placeholder="you@university.edu"
             {...register('email')}
             error={errors.email?.message}
           />
@@ -92,14 +106,20 @@ export default function RegisterPage() {
             error={errors.password?.message}
           />
 
-          <Button type="submit" variant="primary" size="md" className="w-full mt-2" isLoading={isSubmitting}>
+          <Button
+            type="submit"
+            variant="primary"
+            size="md"
+            className="w-full mt-3 font-semibold shadow-md shadow-accent/25"
+            isLoading={isSubmitting}
+          >
             Create Account
           </Button>
         </form>
 
         <p className="text-center text-xs text-foreground-muted mt-6">
           Already have an account?{' '}
-          <Link href="/login" className="text-accent hover:underline font-medium">
+          <Link href="/login" className="text-accent hover:underline font-semibold">
             Sign in
           </Link>
         </p>

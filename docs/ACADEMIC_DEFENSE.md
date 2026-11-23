@@ -20,7 +20,7 @@ StudyFlow is designed around a decoupled, monorepo architecture utilizing **npm 
 
 ```mermaid
 flowchart TD
-    subgraph Client["Frontend Client (Next.js 15 App Router)"]
+    subgraph Client["Frontend Client (next.js 16 App Router)"]
         UI["UI Layer (Tailwind CSS, GSAP, Framer Motion)"]
         Stores["State Management (Zustand: Auth, Timer, Room)"]
         SocketHook["Socket Hook & Reconciler (useRoomSocket)"]
@@ -57,7 +57,7 @@ flowchart TD
 ```
 studyflow/
 ├── apps/
-│   ├── web/                     # Next.js 15 App Router frontend
+│   ├── web/                     # next.js 16 App Router frontend
 │   │   ├── app/                 # Routes: landing, dashboard, rooms, tasks, analytics, settings
 │   │   ├── components/          # Reusable UI, PomodoroTimer, TaskBoard, ParticipantList
 │   │   ├── hooks/               # useRoomSocket, useAuth

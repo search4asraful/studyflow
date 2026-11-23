@@ -19,7 +19,7 @@ StudyFlow is a modern, real-time collaborative workspace designed for high-focus
 ## 🛠️ Technology Stack
 
 ### Frontend (`apps/web`)
-- **Next.js 15 (App Router)** & React 19
+- **Next.js 16 (App Router)** & React 19
 - **TypeScript** (strict mode enabled)
 - **Tailwind CSS** (custom dark & light productivity theme)
 - **GSAP & @gsap/react** (landing page animations)

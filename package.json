@@ -8,6 +8,7 @@
   "scripts": {
     "dev:server": "npm run dev --workspace=@studyflow/server",
     "dev:web": "npm run dev --workspace=@studyflow/web",
+    "lint": "npm run lint --workspaces",
     "build": "npm run build --workspaces",
     "test": "npm run test --workspace=@studyflow/server",
     "db:push": "npx prisma db push --schema=apps/server/prisma/schema.prisma",

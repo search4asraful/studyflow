@@ -64,8 +64,6 @@ model User {
   assignedTasks   Task[]            @relation("TaskAssignee")
   pomodoroRecords PomodoroRecord[]
   notifications   Notification[]
-  taskActivities  TaskActivity[]
-  roomActivities  RoomActivity[]
 
   @@index([email])
 }
@@ -103,7 +101,6 @@ model StudyRoom {
   timerState     TimerState?
   sessions       StudySession[]
   tasks          Task[]
-  activities     RoomActivity[]
   pomodoroRecords PomodoroRecord[]
 
   @@index([inviteCode])
@@ -194,37 +191,9 @@ model Task {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
-  activities  TaskActivity[]
-
   @@index([roomId, status])
   @@index([assigneeId])
   @@index([createdById])
-}
-
-model TaskActivity {
-  id        String   @id @default(uuid())
-  taskId    String
-  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  action    String
-  details   Json?
-  createdAt DateTime @default(now())
-
-  @@index([taskId])
-}
-
-model RoomActivity {
-  id        String    @id @default(uuid())
-  roomId    String
-  room      StudyRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  action    String
-  details   String?
-  createdAt DateTime  @default(now())
-
-  @@index([roomId, createdAt])
 }
 
 model Notification {

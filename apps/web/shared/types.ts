@@ -118,6 +118,7 @@ export interface RoomActivity {
   userName: string;
   action: string;
   details?: string;
+  recipientId?: string;
   createdAt: string;
 }
 

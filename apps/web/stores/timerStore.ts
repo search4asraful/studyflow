@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { AuthoritativeTimerState, TimerPhase, TimerStatus } from '@studyflow/shared';
-import { playCompletionChime } from '../lib/audio';
 
 interface TimerStoreState {
   authoritativeState: AuthoritativeTimerState | null;
@@ -27,13 +26,6 @@ export const useTimerStore = create<TimerStoreState>((set, get) => ({
   percentRemaining: 100,
 
   syncAuthoritativeState: (state) => {
-    const prevPhase = get().phase;
-    const isNewPhase = prevPhase !== state.phase && get().authoritativeState !== null;
-
-    if (isNewPhase) {
-      playCompletionChime();
-    }
-
     const duration = state.totalPhaseDuration || 1500;
     const percent = Math.min(100, Math.max(0, (state.remainingSeconds / duration) * 100));
 

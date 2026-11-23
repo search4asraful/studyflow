@@ -7,6 +7,7 @@ import { prisma } from '../config/prisma';
 import { TimerService } from '../services/timerService';
 import { TaskService } from '../services/taskService';
 import { RoomService } from '../services/roomService';
+import { RoomActivityService } from '../services/activityMemory';
 import { SOCKET_EVENTS, SafeUser } from '../shared';
 
 interface AuthenticatedSocket extends Socket {
@@ -46,6 +47,7 @@ export function setupSocketServer(httpServer: HttpServer): SocketIOServer {
   // Attach Socket.IO instance to services
   TimerService.setSocketServer(io);
   TaskService.setSocketServer(io);
+  RoomActivityService.setSocketServer(io);
 
   // Authentication Middleware
   io.use(async (socket: Socket, next) => {
@@ -97,7 +99,6 @@ export function setupSocketServer(httpServer: HttpServer): SocketIOServer {
   io.on('connection', (rawSocket: Socket) => {
     const socket = rawSocket as AuthenticatedSocket;
     const user = socket.data.user;
-    // console.log(`[Socket] User connected: ${user.name} (${socket.id})`);
 
     // Join room
     socket.on(SOCKET_EVENTS.CLIENT.ROOM_JOIN, async (data: { roomId: string }, callback) => {
@@ -124,6 +125,14 @@ export function setupSocketServer(httpServer: HttpServer): SocketIOServer {
           user,
           roomId,
           timestamp: new Date().toISOString(),
+        });
+
+        // Broadcast live ephemeral participant join activity
+        RoomActivityService.broadcastActivity(roomId, {
+          userId: user.id,
+          userName: user.name,
+          action: 'MEMBER_JOINED',
+          details: `${user.name} joined the room`,
         });
 
         // Send full authoritative room state back to the joiner
@@ -157,8 +166,20 @@ export function setupSocketServer(httpServer: HttpServer): SocketIOServer {
           userName: user.name,
           roomId,
         });
-      } catch (err) {
-        console.error('[Socket] Leave room error:', err);
+
+        // Broadcast live ephemeral participant leave activity
+        RoomActivityService.broadcastActivity(roomId, {
+          userId: user.id,
+          userName: user.name,
+          action: 'MEMBER_LEFT',
+          details: `${user.name} left the room`,
+        });
+
+        if (TimerService.getActiveParticipants(roomId).length === 0) {
+          RoomActivityService.clearRoom(roomId);
+        }
+      } catch {
+        // Silently handled without console exposure
       }
     });
 
@@ -242,7 +263,7 @@ export function setupSocketServer(httpServer: HttpServer): SocketIOServer {
 
     // Participant heartbeat
     socket.on(SOCKET_EVENTS.CLIENT.PARTICIPANT_HEARTBEAT, async (data: { roomId: string }) => {
-      if (data?.roomId) {
+      if (data?.roomId && socket.data.joinedRooms.has(data.roomId)) {
         TimerService.registerParticipant(data.roomId, user.id);
         await prisma.roomMember.updateMany({
           where: { roomId: data.roomId, userId: user.id },
@@ -251,21 +272,42 @@ export function setupSocketServer(httpServer: HttpServer): SocketIOServer {
       }
     });
 
-    // Room real-time activity/chat
-    socket.on(SOCKET_EVENTS.CLIENT.ROOM_CHAT, async (data: { roomId: string; message: string }) => {
+    // Room real-time activity/chat (handled entirely in-memory via socket, zero database writes)
+    socket.on(SOCKET_EVENTS.CLIENT.ROOM_CHAT, async (data: { roomId: string; message: string; recipientId?: string }) => {
       if (!data?.roomId || !data?.message?.trim()) return;
+      if (!socket.data.joinedRooms.has(data.roomId)) {
+        return;
+      }
 
-      const activity = {
-        id: `chat_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-        roomId: data.roomId,
-        userId: user.id,
-        userName: user.name,
-        action: 'CHAT_MESSAGE',
-        details: data.message.trim(),
-        createdAt: new Date().toISOString(),
-      };
+      if (data.recipientId) {
+        // Direct private message between two meeting participants
+        const directActivity = {
+          id: `dm_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          roomId: data.roomId,
+          userId: user.id,
+          userName: user.name,
+          action: 'DIRECT_CHAT',
+          details: data.message.trim(),
+          recipientId: data.recipientId,
+          createdAt: new Date().toISOString(),
+        };
 
-      io.to(`room:${data.roomId}`).emit(SOCKET_EVENTS.SERVER.ROOM_ACTIVITY, activity);
+        const activeSockets = await io.in(`room:${data.roomId}`).fetchSockets();
+        for (const s of activeSockets) {
+          const clientSock = s as unknown as AuthenticatedSocket;
+          if (clientSock.data?.user?.id === data.recipientId || clientSock.data?.user?.id === user.id) {
+            clientSock.emit(SOCKET_EVENTS.SERVER.ROOM_ACTIVITY, directActivity);
+          }
+        }
+      } else {
+        // Broadcast group chat message to active room participants
+        RoomActivityService.broadcastActivity(data.roomId, {
+          userId: user.id,
+          userName: user.name,
+          action: 'CHAT_MESSAGE',
+          details: data.message.trim(),
+        });
+      }
     });
 
     // Handle disconnect
@@ -277,6 +319,18 @@ export function setupSocketServer(httpServer: HttpServer): SocketIOServer {
           userName: user.name,
           roomId,
         });
+
+        // Broadcast live ephemeral participant leave activity
+        RoomActivityService.broadcastActivity(roomId, {
+          userId: user.id,
+          userName: user.name,
+          action: 'MEMBER_LEFT',
+          details: `${user.name} left the room`,
+        });
+
+        if (TimerService.getActiveParticipants(roomId).length === 0) {
+          RoomActivityService.clearRoom(roomId);
+        }
       }
     });
   });
