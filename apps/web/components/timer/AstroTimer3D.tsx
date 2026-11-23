@@ -1,17 +1,16 @@
 'use client';
 
-import gsap from 'gsap';
-import {
-    Coffee,
-    Maximize2,
-    Minimize2,
-    Pause,
-    Play,
-    SkipForward,
-    Sparkles,
-} from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import {
+  Coffee,
+  Maximize2,
+  Minimize2,
+  Pause,
+  Play,
+  SkipForward,
+  Sparkles,
+} from 'lucide-react';
 import { triggerConfetti } from '../../lib/confetti';
 import { cn } from '../../lib/utils';
 import { useRoomStore } from '../../stores/roomStore';
@@ -33,9 +32,6 @@ export const AstroTimer3D: React.FC<AstroTimer3DProps> = ({
   className = '',
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const cardRef = useRef<HTMLDivElement>(null);
-  const circleStageRef = useRef<HTMLDivElement>(null);
-  const ringRef = useRef<SVGSVGElement>(null);
 
   // Authoritative Timer Store state
   const storeDisplaySeconds = useTimerStore((s) => s.displaySeconds);
@@ -49,25 +45,21 @@ export const AstroTimer3D: React.FC<AstroTimer3DProps> = ({
   // Room details
   const room = useRoomStore((s) => s.room);
 
-  // Local fallback state (used if authoritative socket is not connected)
+  // Local fallback state
   const [localSeconds, setLocalSeconds] = useState<number | null>(null);
   const [isLocalRunning, setIsLocalRunning] = useState(false);
   const [localCycle, setLocalCycle] = useState(1);
   const [localPhase, setLocalPhase] = useState<'FOCUS' | 'SHORT_BREAK' | 'LONG_BREAK'>('FOCUS');
 
   const [isZenMode, setIsZenMode] = useState(false);
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
   const isAuthoritative = authoritativeState !== null;
-
-  // Total cycles configured for the room (defaults to 4)
   const cyclesTotal = room?.cyclesBeforeLongBreak || 4;
 
-  // Helper to determine duration based on phase
   const getPhaseDuration = (p: 'FOCUS' | 'SHORT_BREAK' | 'LONG_BREAK') => {
-    if (p === 'SHORT_BREAK') return room?.shortBreakDuration || 300; // 5 min
-    if (p === 'LONG_BREAK') return room?.longBreakDuration || 900; // 15 min
-    return room?.focusDuration || 1500; // room's configured focus duration
+    if (p === 'SHORT_BREAK') return room?.shortBreakDuration || 300;
+    if (p === 'LONG_BREAK') return room?.longBreakDuration || 900;
+    return room?.focusDuration || 1500;
   };
 
   const phase = isAuthoritative ? storePhase : localPhase;
@@ -77,7 +69,6 @@ export const AstroTimer3D: React.FC<AstroTimer3DProps> = ({
     : !isLocalRunning && localSeconds !== null && localSeconds < getPhaseDuration(phase);
   const currentCycle = isAuthoritative ? storeCurrentCycle : localCycle;
 
-  // Exact duration for the active cycle/phase (never hardcoded to 25!)
   const totalCycleSeconds =
     isAuthoritative && storeTotalDuration > 0
       ? storeTotalDuration
@@ -89,7 +80,6 @@ export const AstroTimer3D: React.FC<AstroTimer3DProps> = ({
     ? localSeconds
     : totalCycleSeconds;
 
-  // Format MM:SS
   const formatTime = (secs: number) => {
     const safeSecs = Math.max(0, Math.floor(secs));
     const mins = Math.floor(safeSecs / 60);
@@ -110,7 +100,6 @@ export const AstroTimer3D: React.FC<AstroTimer3DProps> = ({
             setIsLocalRunning(false);
             triggerConfetti({ particleCount: 90 });
 
-            // Cycle transition
             if (phase === 'FOCUS') {
               const isLongBreak = currentCycle >= cyclesTotal;
               const nextPhase = isLongBreak ? 'LONG_BREAK' : 'SHORT_BREAK';
@@ -127,7 +116,7 @@ export const AstroTimer3D: React.FC<AstroTimer3DProps> = ({
       }, 1000);
     }
     return () => clearInterval(timer);
-  }, [isAuthoritative, isLocalRunning, secondsRemaining, phase, currentCycle, cyclesTotal]);
+  }, [isAuthoritative, isLocalRunning, secondsRemaining, phase, currentCycle, cyclesTotal, totalCycleSeconds]);
 
   // Track phase transitions for celebration
   const prevPhaseRef = useRef(phase);
@@ -140,62 +129,28 @@ export const AstroTimer3D: React.FC<AstroTimer3DProps> = ({
     }
   }, [phase]);
 
-  // Pointer-driven 3D tilt & parallax physics applied directly to the timer circle
-  const handleCircleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!circleStageRef.current) return;
-    const rect = circleStageRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left - rect.width / 2;
-    const y = e.clientY - rect.top - rect.height / 2;
-
-    const normX = Math.max(-1, Math.min(1, x / (rect.width / 2)));
-    const normY = Math.max(-1, Math.min(1, y / (rect.height / 2)));
-
-    setMousePos({ x: normX, y: normY });
-
-    gsap.to(circleStageRef.current, {
-      rotateY: normX * 18,
-      rotateX: -normY * 18,
-      transformPerspective: 1000,
-      scale: 1.04,
-      duration: 0.35,
-      ease: 'power2.out',
-    });
-  };
-
-  const handleCircleMouseLeave = () => {
-    if (!circleStageRef.current) return;
-    setMousePos({ x: 0, y: 0 });
-    gsap.to(circleStageRef.current, {
-      rotateX: 0,
-      rotateY: 0,
-      scale: 1,
-      duration: 0.6,
-      ease: 'power3.out',
-    });
-  };
-
-  // Keyboard shortcut listener (Space = Toggle, S = Skip, Z = Zen)
+  // Keyboard shortcut listener: Space to Toggle, S to Skip, Z for Zen
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement ||
-        (e.target as HTMLElement).isContentEditable
-      ) {
-        return;
-      }
+      const activeEl = document.activeElement;
+      const isInputFocused =
+        activeEl &&
+        (activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          (activeEl as HTMLElement).isContentEditable);
+
+      if (isInputFocused) return;
 
       if (e.code === 'Space') {
         e.preventDefault();
         handleToggleTimer();
-      } else if (e.key.toLowerCase() === 's') {
+      } else if (e.code === 'KeyS' && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         handleSkip();
-      } else if (e.key.toLowerCase() === 'z') {
+      } else if (e.code === 'KeyZ' && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         setIsZenMode((z) => !z);
       } else if (e.key === 'Escape' && isZenMode) {
-        e.preventDefault();
         setIsZenMode(false);
       }
     };
@@ -226,7 +181,6 @@ export const AstroTimer3D: React.FC<AstroTimer3DProps> = ({
     if (onSkip) {
       onSkip();
     } else {
-      // Local fallback transition
       if (phase === 'FOCUS') {
         const isLong = currentCycle >= cyclesTotal;
         const nextPhase = isLong ? 'LONG_BREAK' : 'SHORT_BREAK';
@@ -242,225 +196,139 @@ export const AstroTimer3D: React.FC<AstroTimer3DProps> = ({
     }
   };
 
-  // Circular progress calculations (Radius = 125)
-  const radius = 125;
-  const circumference = 2 * Math.PI * radius;
   const percentRemaining =
     isAuthoritative && storePercentRemaining !== undefined
       ? storePercentRemaining
       : totalCycleSeconds > 0
       ? (secondsRemaining / totalCycleSeconds) * 100
       : 100;
-  const strokeDashoffset = circumference - (percentRemaining / 100) * circumference;
 
-  // Phase label
   const phaseLabel =
     phase === 'SHORT_BREAK'
       ? 'SHORT BREAK'
       : phase === 'LONG_BREAK'
-      ? 'LONG RECOVERY BREAK'
-      : 'DEEP FOCUS SESSION';
+      ? 'LONG BREAK'
+      : 'FOCUS';
 
   return (
-    <div ref={containerRef} className={cn('relative w-full', className)}>
-      {/* Outer Card: Stable, grounded, adhering to global theme */}
-      <div
-        ref={cardRef}
-        className="card-glass relative rounded-3xl p-6 sm:p-7 bg-surface/90 border border-border shadow-xl backdrop-blur-xl overflow-hidden transition-colors duration-200"
-      >
-        {/* Layered Specular Glow Backdrop inside Card */}
-        <div
-          className="absolute w-80 h-80 rounded-full blur-[110px] pointer-events-none opacity-25 dark:opacity-20 transition-all duration-700 -translate-x-1/2 -translate-y-1/2"
-          style={{
-            background: isRunning
-              ? 'radial-gradient(circle, var(--color-accent) 0%, transparent 70%)'
-              : 'radial-gradient(circle, var(--color-accent-hover) 0%, transparent 70%)',
-            top: '35%',
-            left: '50%',
-          }}
-        />
-
-        {/* Top Header Strip: Phase Badge, PAUSED/RUNNING Badge, Expand Button */}
-        <div className="flex items-center justify-between w-full mb-3 z-10 relative">
-          {/* Phase Badge (dynamic per cycle/phase) */}
-          <div className="badge-accent bg-accent-muted text-accent border border-accent/40 shadow-xs">
-            {phase === 'FOCUS' ? (
-              <Sparkles className="w-3.5 h-3.5 text-accent animate-pulse" />
-            ) : (
-              <Coffee className="w-3.5 h-3.5 text-accent animate-bounce" />
-            )}
-            <span>{phaseLabel}</span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/* PAUSED / RUNNING Status Badge */}
-            <span
-              className={cn(
-                'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-semibold uppercase tracking-wider border shadow-xs transition-colors',
-                isRunning
-                  ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/35'
-                  : isPaused
-                  ? 'bg-amber-500/15 text-amber-400 border-amber-500/35'
-                  : 'bg-surface-elevated text-foreground-muted border-border'
+    <div ref={containerRef} className={cn('relative w-full shrink-0', className)}>
+      <div className="relative rounded-xl px-3 sm:px-4 py-2 sm:py-2.5 bg-surface/90 border border-border/80 shadow-xs backdrop-blur-xl overflow-hidden transition-all duration-200">
+        <div className="flex items-center justify-between gap-3 sm:gap-6 relative z-10">
+          {/* LEFT: Phase Badge, Status Indicator, and Cycle Dots */}
+          <div className="flex items-center gap-2 sm:gap-3.5 shrink-0">
+            {/* Phase Badge */}
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-accent/15 text-accent border border-accent/30 shadow-2xs">
+              {phase === 'FOCUS' ? (
+                <Sparkles className="w-3.5 h-3.5 text-accent animate-pulse" />
+              ) : (
+                <Coffee className="w-3.5 h-3.5 text-accent animate-bounce" />
               )}
-            >
-              <span
-                className={cn(
-                  'w-2 h-2 rounded-full',
-                  isRunning
-                    ? 'bg-emerald-400 animate-ping'
-                    : isPaused
-                    ? 'bg-amber-400'
-                    : 'bg-foreground-muted'
-                )}
-              />
-              {isRunning ? 'RUNNING' : isPaused ? 'PAUSED' : 'READY'}
-            </span>
-
-            {/* Expand / Zen Mode Button */}
-            <button
-              onClick={() => setIsZenMode(true)}
-              className="p-1.5 rounded-xl bg-surface-elevated hover:bg-surface-subtle text-foreground-secondary hover:text-foreground border border-border transition-all cursor-pointer shadow-xs active:scale-95"
-              title="Fullscreen Zen Mode (Z)"
-            >
-              <Maximize2 className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Pointer-Driven 3D Spatial Gyroscopic Timer Circle Stage */}
-        <div
-          ref={circleStageRef}
-          onMouseMove={handleCircleMouseMove}
-          onMouseLeave={handleCircleMouseLeave}
-          className="relative flex items-center justify-center w-64 h-64 sm:w-72 sm:h-72 mx-auto my-2 select-none cursor-pointer rounded-full"
-          style={{
-            transformStyle: 'preserve-3d',
-          }}
-        >
-          {/* SVG Progress Ring Stage */}
-          <svg
-            ref={ringRef}
-            className="w-full h-full -rotate-90 transform drop-shadow-xl pointer-events-none transition-all duration-75"
-            viewBox="0 0 300 300"
-            style={{
-              transform: `translateZ(45px)`,
-              filter: `drop-shadow(${-mousePos.x * 10}px ${-mousePos.y * 10}px 14px rgba(63, 114, 175, 0.4))`,
-            }}
-          >
-            {/* Background Track Circle */}
-            <circle
-              cx="150"
-              cy="150"
-              r={radius}
-              stroke="currentColor"
-              className="text-border-subtle opacity-40 dark:opacity-20"
-              strokeWidth="8"
-              fill="transparent"
-            />
-            {/* Animated Progress Circle */}
-            <circle
-              cx="150"
-              cy="150"
-              r={radius}
-              stroke="url(#timerThemeAccentGrad)"
-              strokeWidth="9"
-              strokeDasharray={circumference}
-              strokeDashoffset={strokeDashoffset}
-              strokeLinecap="round"
-              fill="transparent"
-              className="transition-all duration-700 ease-linear"
-            />
-            <defs>
-              <linearGradient id="timerThemeAccentGrad" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor="var(--color-accent)" />
-                <stop offset="100%" stopColor="var(--color-accent-hover)" />
-              </linearGradient>
-            </defs>
-          </svg>
-
-          {/* Central Readout & Step Dots with Elevated 3D Parallax */}
-          <div
-            className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none transition-transform duration-75"
-            style={{
-              transform: `translate3d(${mousePos.x * 6}px, ${mousePos.y * 6}px, 65px)`,
-              transformStyle: 'preserve-3d',
-            }}
-          >
-            {/* Countdown Clock (dynamically shows accurate time for the current cycle) */}
-            <div className="text-6xl sm:text-7xl font-bold font-mono tracking-tighter text-foreground drop-shadow-md">
-              {formatTime(secondsRemaining)}
+              <span>{phaseLabel}</span>
             </div>
 
-            {/* CYCLE Step Dots (dynamic per room settings) */}
-            <div className="flex items-center gap-2.5 mt-3">
+            {/* Cycle indicator */}
+            <div className="hidden sm:flex items-center gap-1.5">
               {Array.from({ length: cyclesTotal }).map((_, i) => (
-                <div
+                <span
                   key={i}
                   className={cn(
-                    'w-2.5 h-2.5 rounded-full transition-all duration-300',
+                    'w-2 h-2 rounded-full transition-all duration-300',
                     i + 1 === currentCycle
-                      ? 'bg-accent scale-125 shadow-md shadow-accent/50'
+                      ? 'bg-accent scale-125 shadow-xs shadow-accent'
                       : i + 1 < currentCycle
-                      ? 'bg-accent/75'
+                      ? 'bg-accent/70'
                       : 'bg-surface-elevated border border-border'
                   )}
                   title={`Cycle ${i + 1} of ${cyclesTotal}`}
                 />
               ))}
+              <span className="text-[10px] font-mono text-foreground-muted ml-1">
+                {currentCycle}/{cyclesTotal}
+              </span>
             </div>
 
-            <span className="text-[11px] font-mono font-semibold uppercase tracking-widest text-foreground-muted mt-2">
-              {phase === 'SHORT_BREAK'
-                ? 'SHORT BREAK • RECHARGE'
-                : phase === 'LONG_BREAK'
-                ? 'LONG BREAK • EXTENDED REST'
-                : `CYCLE ${currentCycle} OF ${cyclesTotal}`}
-            </span>
+            {/* Status Indicator */}
+            <div className="hidden md:flex items-center gap-1.5 text-[10px] font-mono text-foreground-muted">
+              <span
+                className={cn(
+                  'w-1.5 h-1.5 rounded-full',
+                  isRunning ? 'bg-emerald-400 animate-ping' : isPaused ? 'bg-amber-400' : 'bg-foreground-muted'
+                )}
+              />
+              <span className="font-semibold uppercase text-foreground-secondary">
+                {isRunning ? 'RUNNING' : isPaused ? 'PAUSED' : 'READY'}
+              </span>
+            </div>
           </div>
-        </div>
 
-        {/* Controls: Resume / Pause CTA Button + Skip / Next Button */}
-        <div className="mt-3 flex flex-col items-center gap-3 z-10 relative w-full max-w-xs mx-auto">
-          <div className="flex items-center justify-center gap-3 w-full">
-            {/* Resume / Pause / Start CTA */}
+          {/* CENTER: Countdown Display & Mini Progress */}
+          <div className="flex items-center gap-3">
+            <span
+              onClick={handleToggleTimer}
+              className="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight text-foreground cursor-pointer select-none hover:text-accent transition-colors"
+              title="Click to toggle"
+            >
+              {formatTime(secondsRemaining)}
+            </span>
+
+            {/* Mini Progress Track */}
+            <div className="hidden md:flex flex-col gap-0.5 w-20 xl:w-28">
+              <div className="w-full h-1.5 bg-surface-subtle rounded-full overflow-hidden border border-border/60">
+                <div
+                  className="h-full bg-accent rounded-full transition-all duration-500 ease-linear"
+                  style={{ width: `${percentRemaining}%` }}
+                />
+              </div>
+              <span className="text-[9px] font-mono text-foreground-muted text-right">
+                {Math.round(percentRemaining)}%
+              </span>
+            </div>
+          </div>
+
+          {/* RIGHT: Action Buttons */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Play/Pause Button */}
             <button
               onClick={handleToggleTimer}
               className={cn(
-                'flex-1 inline-flex items-center justify-center gap-2 py-3 px-5 rounded-2xl font-bold text-sm select-none transition-all duration-200 cursor-pointer shadow-md active:scale-95',
+                'h-8 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg font-bold text-xs select-none transition-all duration-200 cursor-pointer shadow-xs active:scale-95',
                 isRunning
-                  ? 'btn-secondary bg-surface-elevated hover:bg-surface-subtle text-amber-400 border border-amber-500/30'
-                  : 'btn-primary bg-accent hover:bg-accent-hover text-white shadow-lg shadow-accent/25'
+                  ? 'bg-surface-elevated hover:bg-surface-subtle text-amber-400 border border-amber-500/30'
+                  : 'bg-accent hover:bg-accent-hover text-white shadow-accent/25'
               )}
             >
               {isRunning ? (
                 <>
-                  <Pause className="w-4 h-4 fill-current" />
+                  <Pause className="w-3.5 h-3.5 fill-current" />
                   <span>Pause</span>
                 </>
               ) : (
                 <>
-                  <Play className="w-4 h-4 fill-current" />
+                  <Play className="w-3.5 h-3.5 fill-current" />
                   <span>{isPaused ? 'Resume' : 'Start'}</span>
                 </>
               )}
             </button>
 
-            {/* Skip / Next Step Button */}
+            {/* Skip Button */}
             <button
               onClick={handleSkip}
-              className="p-3 rounded-2xl btn-secondary bg-surface-elevated hover:bg-surface-subtle text-foreground-secondary hover:text-foreground border border-border transition-all cursor-pointer shadow-xs active:scale-95"
-              title="Skip to next interval (S)"
+              className="h-8 w-8 inline-flex items-center justify-center rounded-lg bg-surface-elevated hover:bg-surface-subtle text-foreground-secondary hover:text-foreground border border-border transition-all cursor-pointer shadow-2xs active:scale-95"
+              title="Skip to next (S)"
+              type="button"
             >
-              <SkipForward className="w-4 h-4" />
+              <SkipForward className="w-3.5 h-3.5" />
             </button>
-          </div>
 
-          {/* Bottom Caption */}
-          <div className="flex items-center justify-center gap-2 text-[11px] font-mono text-foreground-muted uppercase tracking-wider">
-            <span>Authoritative Engine</span>
-            <span>•</span>
-            <span>Zero Clock Drift</span>
+            {/* Fullscreen Zen Mode Button */}
+            <button
+              onClick={() => setIsZenMode(true)}
+              className="h-8 w-8 inline-flex items-center justify-center rounded-lg bg-surface-elevated hover:bg-surface-subtle text-foreground-secondary hover:text-foreground border border-border transition-all cursor-pointer shadow-2xs active:scale-95"
+              title="Fullscreen Zen Mode (Z)"
+              type="button"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
       </div>
@@ -469,7 +337,7 @@ export const AstroTimer3D: React.FC<AstroTimer3DProps> = ({
       {isZenMode &&
         typeof document !== 'undefined' &&
         createPortal(
-          <div className="fixed inset-0 z-50 bg-canvas text-foreground flex flex-col items-center justify-between p-8 sm:p-12 animate-in fade-in duration-150 transform-gpu">
+          <div className="fixed inset-0 z-50 bg-canvas text-foreground flex flex-col items-center justify-between p-6 sm:p-12 animate-in fade-in duration-150 transform-gpu">
             <div className="flex items-center justify-between w-full max-w-4xl">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-xl bg-linear-to-tr from-accent to-sky-400 text-white flex items-center justify-center font-bold text-sm">
@@ -490,10 +358,10 @@ export const AstroTimer3D: React.FC<AstroTimer3DProps> = ({
             </div>
 
             <div className="text-center my-auto">
-              <span className="text-xs font-mono uppercase tracking-widest px-3 py-1 rounded-full badge-accent bg-accent-muted text-accent border border-accent/40 mb-4 inline-block">
+              <span className="text-xs font-mono uppercase tracking-widest px-3 py-1 rounded-full bg-accent/15 text-accent border border-accent/40 mb-4 inline-block">
                 {phaseLabel}
               </span>
-              <div className="text-8xl sm:text-9xl font-mono font-bold tracking-tighter text-foreground drop-shadow-2xl my-3">
+              <div className="text-7xl sm:text-9xl font-mono font-bold tracking-tighter text-foreground drop-shadow-2xl my-3">
                 {formatTime(secondsRemaining)}
               </div>
               <p className="text-xs font-mono text-foreground-muted uppercase tracking-widest mt-2">
@@ -507,13 +375,13 @@ export const AstroTimer3D: React.FC<AstroTimer3DProps> = ({
               <div className="mt-8 flex items-center justify-center gap-4">
                 <button
                   onClick={handleToggleTimer}
-                  className="px-8 py-3.5 rounded-2xl btn-primary bg-accent hover:bg-accent-hover text-white font-bold text-sm shadow-xl active:scale-95 transition-all cursor-pointer"
+                  className="px-8 py-3.5 rounded-2xl bg-accent hover:bg-accent-hover text-white font-bold text-sm shadow-xl active:scale-95 transition-all cursor-pointer"
                 >
                   {isRunning ? 'Pause' : isPaused ? 'Resume' : 'Start'}
                 </button>
                 <button
                   onClick={handleSkip}
-                  className="p-3.5 rounded-2xl btn-secondary bg-surface-elevated hover:bg-surface-subtle text-foreground border border-border transition-all cursor-pointer"
+                  className="p-3.5 rounded-2xl bg-surface-elevated hover:bg-surface-subtle text-foreground border border-border transition-all cursor-pointer"
                   title="Skip"
                 >
                   <SkipForward className="w-5 h-5" />

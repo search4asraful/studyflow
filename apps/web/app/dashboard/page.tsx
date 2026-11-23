@@ -115,8 +115,8 @@ export default function DashboardPage() {
         <div className="card-glass p-6 sm:p-8 relative overflow-hidden border-accent/25">
           <div className="absolute top-0 right-0 w-96 h-96 bg-accent/15 rounded-full blur-[100px] pointer-events-none -mr-20 -mt-20" />
 
-          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative z-10">
-            <div className="space-y-2 max-w-xl">
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-start-safe gap-6 relative z-10">
+            <div className="space-y-2 flex-1">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                 <span className="text-xs font-mono uppercase tracking-widest text-accent font-semibold">
@@ -171,7 +171,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Actions */}
-            <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="flex sm:flex-col items-center gap-3 w-full sm:w-auto">
               <Link href="/rooms" className="flex-1 sm:flex-initial">
                 <Button variant="secondary" size="md" className="w-full gap-2">
                   <Users className="w-4 h-4 text-accent" />

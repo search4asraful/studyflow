@@ -1,33 +1,52 @@
 'use client';
 
-import {
-    Command,
-    LayoutDashboard,
-    LogOut,
-    Plus,
-    Search,
-    Sparkles
-} from 'lucide-react';
-import Link from 'next/link';
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import {
+  LayoutDashboard,
+  Search,
+  Globe,
+  ArrowUpRight,
+  ArrowRight,
+} from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
-import { Button } from '../ui/Button';
 import { CommandPalette } from '../ui/CommandPalette';
 import { ThemeToggle } from '../ui/ThemeToggle';
 
-export const Navbar: React.FC = () => {
+export interface NavbarProps {
+  variant?: 'auto' | 'frontend' | 'admin';
+}
+
+export const Navbar: React.FC<NavbarProps> = ({ variant = 'auto' }) => {
+  const pathname = usePathname();
   const user = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const checkAuth = useAuthStore((s) => s.checkAuth);
-  const logout = useAuthStore((s) => s.logout);
 
   const [isCommandOpen, setIsCommandOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [isMac, setIsMac] = useState(false);
+
+  // Determine if we are rendering in the Admin Panel or Frontend
+  const isAdminPanel =
+    variant === 'admin' ||
+    (variant !== 'frontend' &&
+      pathname !== null &&
+      (pathname.startsWith('/dashboard') ||
+        pathname.startsWith('/rooms') ||
+        pathname.startsWith('/tasks') ||
+        pathname.startsWith('/analytics') ||
+        pathname.startsWith('/settings') ||
+        pathname.startsWith('/admin')));
 
   // Hydration safety & background session verification
   useEffect(() => {
     setMounted(true);
     checkAuth();
+    if (typeof window !== 'undefined') {
+      setIsMac(/(Mac|iPhone|iPod|iPad)/i.test(navigator.userAgent));
+    }
   }, [checkAuth]);
 
   // Global hotkey listener for Cmd+K / Ctrl+K
@@ -46,109 +65,124 @@ export const Navbar: React.FC = () => {
 
   return (
     <>
-      <header className="h-16 border-b border-border bg-surface/85 backdrop-blur-xl sticky top-0 z-40 px-4 sm:px-6 flex items-center justify-between transition-colors duration-200">
-        {/* Brand Logo & Search Shortcut */}
-        <div className="flex items-center gap-3 sm:gap-6">
-          <Link href={isUserLoggedIn ? '/dashboard' : '/'} className="flex items-center gap-2.5 group">
-            <div className="w-8 h-8 rounded-xl bg-linear-to-tr from-accent via-blue-500 to-sky-400 text-white flex items-center justify-center font-bold text-sm tracking-tight shadow-md shadow-accent/20 group-hover:scale-105 group-hover:shadow-accent/40 transition-all duration-200">
-              SF
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-base tracking-tight text-foreground">
+      <header className="sticky top-0 z-40 w-full border-b border-border/80 bg-surface/85 backdrop-blur-xl transition-all duration-200">
+        <div className="w-full px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3 sm:gap-6">
+          {/* LEFT: Brand */}
+          <div className="flex items-center shrink-0">
+            <Link
+              href={isAdminPanel ? '/dashboard' : '/'}
+              className="flex items-center gap-2.5 group select-none"
+              title={isAdminPanel ? 'StudyFlow Dashboard' : 'StudyFlow Home'}
+            >
+              <div className="w-8 h-8 rounded-xl bg-linear-to-tr from-accent via-blue-500 to-sky-400 text-white flex items-center justify-center font-bold text-sm tracking-tight shadow-md shadow-accent/20 group-hover:scale-105 group-hover:shadow-accent/40 transition-all duration-200">
+                SF
+              </div>
+              <span className="font-extrabold text-base tracking-tight text-foreground">
                 StudyFlow
               </span>
-              <span className="hidden lg:inline-flex items-center gap-1 text-[9px] font-mono font-medium px-1.5 py-0.5 rounded-full bg-accent/10 border border-accent/25 text-accent">
-                <Sparkles className="w-2.5 h-2.5" />
-                Live Sync
-              </span>
-            </div>
-          </Link>
+            </Link>
+          </div>
 
-          {/* Quick Search Trigger Button (Cmd+K) */}
-          <button
-            onClick={() => setIsCommandOpen(true)}
-            className="hidden sm:flex items-center gap-2 px-3 py-1.5 text-xs text-foreground-muted bg-surface-subtle/80 hover:bg-surface-elevated border border-border hover:border-accent/40 rounded-xl transition-all cursor-pointer"
-            title="Search & Quick Commands (⌘K)"
-          >
-            <Search className="w-3.5 h-3.5 text-accent" />
-            <span className="text-foreground-secondary">Quick Search...</span>
-            <kbd className="flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono text-foreground-muted bg-surface border border-border rounded-md shadow-2xs">
-              <Command className="w-2.5 h-2.5" />K
-            </kbd>
-          </button>
-        </div>
+          {/* RIGHT: Quick Search (Ctrl/Command + K), Theme Toggle, Dashboard/Website View, User Profile / Auth */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {/* Quick Search Button: Border divided between icon and text, no white text background */}
+            <button
+              onClick={() => setIsCommandOpen(true)}
+              className="h-9 px-2.5 sm:px-3 inline-flex items-center rounded-xl bg-surface-subtle hover:bg-surface-elevated border border-border hover:border-accent/40 transition-all cursor-pointer shadow-2xs group"
+              title={`Quick Search (${isMac ? '⌘ + K' : 'Ctrl + K'})`}
+              type="button"
+            >
+              {/* Search Icon */}
+              <div className="flex items-center justify-center pr-2">
+                <Search className="w-3.5 h-3.5 text-accent group-hover:scale-110 transition-transform duration-150" />
+              </div>
 
-        {/* Right side controls: Theme, Actions, User Status */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          {/* Color Theme Toggle */}
-          <ThemeToggle />
+              {/* Vertical Border Divider */}
+              <div className="h-4 w-px bg-border group-hover:bg-accent/40 transition-colors" />
 
-          {/* Render authenticated vs unauthenticated states smoothly */}
-          {!mounted ? (
-            // Skeleton pill while mounting to prevent layout jump or auth button flash
-            <div className="h-8 w-24 bg-surface-subtle animate-pulse rounded-xl" />
-          ) : isUserLoggedIn ? (
-            // Authenticated controls: Dashboard button, New Room, Avatar & Logout
-            <div className="flex items-center gap-2 sm:gap-3 pl-2 border-l border-border">
-              <Link href="/dashboard">
-                <Button
-                  size="sm"
-                  variant="primary"
-                  className="gap-1.5 text-xs font-semibold px-3 py-1.5 shadow-sm shadow-accent/20"
-                >
-                  <LayoutDashboard className="w-3.5 h-3.5" />
-                  <span className="hidden xs:inline">Dashboard</span>
-                </Button>
+              {/* Text with no background */}
+              <div className="pl-2 flex items-center font-mono text-[11px] font-medium text-foreground-secondary group-hover:text-foreground transition-colors tracking-tight select-none">
+                <span>{isMac ? '⌘' : 'Ctrl'}</span>
+                <span className="text-foreground-muted/70 mx-1 font-normal">+</span>
+                <span>K</span>
+              </div>
+            </button>
+
+            {/* Theme Toggle (Explicit h-9 w-9) */}
+            <ThemeToggle />
+
+            {/* Dashboard / Website View Toggle (Explicit h-9) */}
+            {isAdminPanel ? (
+              // When in Admin Panel: Button to switch to Website
+              <Link
+                href="/"
+                className="h-9 px-3 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-xl text-xs font-medium text-foreground-secondary hover:text-foreground bg-surface-subtle hover:bg-surface-elevated border border-border hover:border-accent/40 transition-all shadow-2xs"
+                title="View Website"
+              >
+                <Globe className="w-3.5 h-3.5 text-accent" />
+                <span className="hidden sm:inline">Website</span>
+                <ArrowUpRight className="w-3 h-3 opacity-60 hidden md:inline" />
               </Link>
-
-              <Link href="/rooms/create">
-                <Button size="sm" variant="secondary" className="hidden md:inline-flex gap-1.5 text-xs">
-                  <Plus className="w-3.5 h-3.5 text-accent" />
-                  <span>New Room</span>
-                </Button>
+            ) : isUserLoggedIn ? (
+              // When on Frontend & Logged in: Button to go to Dashboard (Explicit h-9)
+              <Link
+                href="/dashboard"
+                className="h-9 px-3 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-xl text-xs font-semibold text-white bg-accent hover:bg-accent-hover border border-white/10 shadow-sm shadow-accent/25 transition-all active:scale-[0.98]"
+                title="Go to Dashboard"
+              >
+                <LayoutDashboard className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Dashboard</span>
+                <ArrowRight className="w-3 h-3 hidden md:inline" />
               </Link>
+            ) : null}
 
-              {/* User Profile Pill */}
-              <div className="flex items-center gap-2 p-1 pl-1.5 pr-2 rounded-xl bg-surface-subtle border border-border">
-                {user?.avatarUrl ? (
-                  <img
-                    src={user.avatarUrl}
-                    alt={user.name || 'User'}
-                    className="w-6 h-6 rounded-lg object-cover border border-accent/40 ring-1 ring-accent/20 shrink-0"
-                  />
-                ) : (
-                  <div className="w-6 h-6 rounded-lg bg-accent/20 border border-accent/30 text-accent flex items-center justify-center font-bold text-xs shrink-0">
-                    {(user?.name || 'U').charAt(0).toUpperCase()}
-                  </div>
-                )}
-                <span className="hidden sm:inline-block text-xs font-medium text-foreground truncate max-w-[110px]">
+            {/* User if logged in else Sign-in / Register (All Explicit h-9) */}
+            {!mounted ? (
+              <div className="h-9 w-20 bg-surface-subtle animate-pulse rounded-xl" />
+            ) : isUserLoggedIn ? (
+              // User Profile Pill (Explicit h-9)
+              <Link
+                href="/settings"
+                className="h-9 px-2.5 inline-flex items-center gap-2 rounded-xl bg-surface-subtle hover:bg-surface-elevated border border-border hover:border-accent/40 transition-all select-none"
+                title="Account Settings"
+              >
+                <div className="relative">
+                  {user?.avatarUrl ? (
+                    <img
+                      src={user.avatarUrl}
+                      alt={user.name || 'User'}
+                      className="w-5 h-5 rounded-lg object-cover border border-accent/40 ring-1 ring-accent/20 shrink-0"
+                    />
+                  ) : (
+                    <div className="w-5 h-5 rounded-lg bg-accent/20 border border-accent/30 text-accent flex items-center justify-center font-bold text-[11px] shrink-0">
+                      {(user?.name || 'U').charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <span className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500 border border-surface" />
+                </div>
+
+                <span className="hidden sm:inline-block text-xs font-medium text-foreground truncate max-w-27.5">
                   {user?.name?.split(' ')[0] || 'User'}
                 </span>
-
-                <button
-                  onClick={() => logout()}
-                  className="text-foreground-muted hover:text-red-500 hover:bg-red-500/10 p-1 rounded-md transition-colors cursor-pointer"
-                  title="Log out"
+              </Link>
+            ) : (
+              // Unauthenticated: Sign in & Register (Explicit h-9)
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <Link
+                  href="/login"
+                  className="h-9 px-3 sm:px-3.5 inline-flex items-center justify-center rounded-xl text-xs font-medium text-foreground-secondary hover:text-foreground hover:bg-surface-elevated transition-colors"
                 >
-                  <LogOut className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          ) : (
-            // Unauthenticated controls: Sign in & Register
-            <div className="flex items-center gap-2 pl-2 border-l border-border">
-              <Link href="/login">
-                <Button size="sm" variant="ghost" className="text-xs font-medium">
                   Sign in
-                </Button>
-              </Link>
-              <Link href="/register">
-                <Button size="sm" variant="primary" className="text-xs font-semibold shadow-xs">
+                </Link>
+                <Link
+                  href="/register"
+                  className="h-9 px-3 sm:px-3.5 inline-flex items-center justify-center rounded-xl text-xs font-semibold text-white bg-accent hover:bg-accent-hover shadow-sm shadow-accent/25 transition-all"
+                >
                   Register
-                </Button>
-              </Link>
-            </div>
-          )}
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 

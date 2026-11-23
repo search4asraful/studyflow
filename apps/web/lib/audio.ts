@@ -233,5 +233,43 @@ export async function playTaskCompletionSound(style?: TaskSoundStyle, ignoreMute
 
 // Backwards-compatibility no-op stubs so any legacy calls never throw
 export async function playCompletionChime() {}
-export async function playChatSound() {}
+
+/**
+ * Plays a subtle, pleasant harmonic notification sound for incoming chat messages.
+ */
+export async function playChatSound() {
+  if (typeof window === 'undefined') return;
+  const settings = getTaskAudioSettings();
+  if (!settings.enabled) return;
+
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    if (ctx.state === 'suspended') {
+      await ctx.resume().catch(() => {});
+    }
+
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(587.33, now); // D5
+    osc.frequency.exponentialRampToValueAtTime(880, now + 0.08); // A5
+
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.linearRampToValueAtTime(0.08, now + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.3);
+  } catch {
+    // Ignore audio playback errors
+  }
+}
+
 export async function playUiClickSound() {}

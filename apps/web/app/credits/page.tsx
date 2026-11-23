@@ -83,7 +83,7 @@ export default function CreditsPage() {
 
   return (
     <div className="min-h-screen bg-canvas text-foreground flex flex-col selection:bg-accent selection:text-accent-contrast transition-colors duration-200">
-      <Navbar />
+      <Navbar variant="frontend" />
 
       <main className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 py-12 w-full space-y-12">
         {/* Back Link */}

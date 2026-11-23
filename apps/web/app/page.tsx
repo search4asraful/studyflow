@@ -7,7 +7,7 @@ import { LandingFooter } from '../components/landing/LandingFooter';
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-canvas text-foreground flex flex-col selection:bg-accent selection:text-accent-contrast transition-colors duration-200">
-      <Navbar />
+      <Navbar variant="frontend" />
       <main className="flex-1">
         <LandingHero />
         <LandingFeatures />
