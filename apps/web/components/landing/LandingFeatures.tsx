@@ -1,20 +1,17 @@
 'use client';
 
-import React, { useRef } from 'react';
-import {
-  Timer,
-  LayoutGrid,
-  Users2,
-  LineChart,
-  Command,
-  Sparkles,
-  Zap,
-  Radio,
-  Lock,
-  Flame,
-} from 'lucide-react';
 import { useGSAP } from '@gsap/react';
 import gsap from 'gsap';
+import {
+    Command,
+    LayoutGrid,
+    LineChart,
+    Radio,
+    Sparkles,
+    Timer,
+    Users2
+} from 'lucide-react';
+import React, { useRef } from 'react';
 
 export const LandingFeatures: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -145,7 +142,7 @@ export const LandingFeatures: React.FC = () => {
                 className="feature-card card-interactive p-6 flex flex-col justify-between group hover:border-accent/50 rounded-2xl bg-surface/85 backdrop-blur-md relative overflow-hidden"
               >
                 {/* Subtle top card glow effect on hover */}
-                <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-accent/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="absolute top-0 inset-x-0 h-1 bg-linear-to-r from-transparent via-accent/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
                 <div>
                   <div className="flex items-center justify-between mb-4">

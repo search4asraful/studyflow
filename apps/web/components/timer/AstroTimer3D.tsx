@@ -1,21 +1,21 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
-import {
-  Play,
-  Pause,
-  SkipForward,
-  Sparkles,
-  Coffee,
-  Maximize2,
-  Minimize2,
-} from 'lucide-react';
 import gsap from 'gsap';
+import {
+    Coffee,
+    Maximize2,
+    Minimize2,
+    Pause,
+    Play,
+    SkipForward,
+    Sparkles,
+} from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { triggerConfetti } from '../../lib/confetti';
-import { useTimerStore } from '../../stores/timerStore';
-import { useRoomStore } from '../../stores/roomStore';
 import { cn } from '../../lib/utils';
+import { useRoomStore } from '../../stores/roomStore';
+import { useTimerStore } from '../../stores/timerStore';
 
 interface AstroTimer3DProps {
   onStart?: () => void;
@@ -472,7 +472,7 @@ export const AstroTimer3D: React.FC<AstroTimer3DProps> = ({
           <div className="fixed inset-0 z-50 bg-canvas text-foreground flex flex-col items-center justify-between p-8 sm:p-12 animate-in fade-in duration-150 transform-gpu">
             <div className="flex items-center justify-between w-full max-w-4xl">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-accent to-sky-400 text-white flex items-center justify-center font-bold text-sm">
+                <div className="w-8 h-8 rounded-xl bg-linear-to-tr from-accent to-sky-400 text-white flex items-center justify-center font-bold text-sm">
                   SF
                 </div>
                 <span className="text-sm font-bold text-foreground">

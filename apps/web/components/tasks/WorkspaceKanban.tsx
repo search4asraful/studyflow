@@ -1,26 +1,26 @@
 'use client';
 
-import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Task, TaskPriority, TaskStatus } from '@studyflow/shared';
-import { Button } from '../ui/Button';
-import {
-  Plus,
-  Search,
-  Filter,
-  CheckCircle2,
-  Clock,
-  Trash2,
-  ArrowRight,
-  ArrowLeft,
-  GripVertical,
-  User,
-} from 'lucide-react';
-import { triggerConfetti } from '../../lib/confetti';
-import { playTaskCompletionSound } from '../../lib/audio';
-import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
-import { cn } from '../../lib/utils';
+import { Task, TaskPriority, TaskStatus } from '@studyflow/shared';
 import { format } from 'date-fns';
+import gsap from 'gsap';
+import {
+    ArrowLeft,
+    ArrowRight,
+    CheckCircle2,
+    Clock,
+    Filter,
+    GripVertical,
+    Plus,
+    Search,
+    Trash2,
+    User,
+} from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { playTaskCompletionSound } from '../../lib/audio';
+import { triggerConfetti } from '../../lib/confetti';
+import { cn } from '../../lib/utils';
+import { Button } from '../ui/Button';
 
 export interface WorkspaceKanbanProps {
   tasks?: Task[];
@@ -480,18 +480,18 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
           <div className="w-full h-2 bg-surface-subtle rounded-full p-0.5 border border-border-subtle overflow-hidden shadow-inner relative">
             <div
               ref={progressBarRef}
-              className="h-full bg-gradient-to-r from-accent via-sky-400 to-emerald-400 rounded-full transition-none relative shadow-xs"
+              className="h-full bg-linear-to-r from-accent via-sky-400 to-emerald-400 rounded-full transition-none relative shadow-xs"
               style={{ width: `${progressPercent}%` }}
             >
               {/* Gloss specular line */}
-              <div className="absolute inset-x-0 top-0 h-[1px] bg-white/35 rounded-full" />
+              <div className="absolute inset-x-0 top-0 h-px bg-white/35 rounded-full" />
             </div>
           </div>
         </div>
       </div>
 
       {/* 4-Column Draggable Kanban Board Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 flex-1 items-start min-h-[460px]">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 flex-1 items-start min-h-115">
         {KANBAN_COLUMNS.map((col) => {
           const colTasks = filteredTasks.filter((t) => t.status === col.id);
           const isTargeted = dragOverColumnId === col.id;
@@ -503,7 +503,7 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
               onDragLeave={(e) => handleColumnDragLeave(e, col.id)}
               onDrop={(e) => handleColumnDrop(e, col.id)}
               className={cn(
-                'flex flex-col bg-surface/80 rounded-2xl p-3.5 min-h-[460px] transition-all duration-200 backdrop-blur-md shadow-2xs border',
+                'flex flex-col bg-surface/80 rounded-2xl p-3.5 min-h-115 transition-all duration-200 backdrop-blur-md shadow-2xs border',
                 isTargeted
                   ? col.dropBorder
                   : 'border-border hover:border-accent/40'
@@ -715,7 +715,7 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
                     {task.assignee.name.charAt(0)}
                   </div>
                 )}
-                <span className="truncate max-w-[80px] text-[10px] text-foreground-muted">
+                <span className="truncate max-w-20 text-[10px] text-foreground-muted">
                   {task.assignee.name.split(' ')[0]}
                 </span>
               </div>
@@ -820,7 +820,7 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
                   {task.assignee.name.charAt(0)}
                 </div>
               )}
-              <span className="truncate max-w-[90px] text-foreground-secondary text-[10px]">
+              <span className="truncate max-w-22.5 text-foreground-secondary text-[10px]">
                 {task.assignee.name}
               </span>
             </div>

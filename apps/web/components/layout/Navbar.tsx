@@ -1,20 +1,19 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { useAuthStore } from '../../stores/authStore';
 import {
-  LogOut,
-  Plus,
-  Search,
-  Command,
-  LayoutDashboard,
-  User,
-  Sparkles,
+    Command,
+    LayoutDashboard,
+    LogOut,
+    Plus,
+    Search,
+    Sparkles
 } from 'lucide-react';
+import Link from 'next/link';
+import React, { useEffect, useState } from 'react';
+import { useAuthStore } from '../../stores/authStore';
 import { Button } from '../ui/Button';
-import { ThemeToggle } from '../ui/ThemeToggle';
 import { CommandPalette } from '../ui/CommandPalette';
+import { ThemeToggle } from '../ui/ThemeToggle';
 
 export const Navbar: React.FC = () => {
   const user = useAuthStore((s) => s.user);
@@ -51,7 +50,7 @@ export const Navbar: React.FC = () => {
         {/* Brand Logo & Search Shortcut */}
         <div className="flex items-center gap-3 sm:gap-6">
           <Link href={isUserLoggedIn ? '/dashboard' : '/'} className="flex items-center gap-2.5 group">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-accent via-blue-500 to-sky-400 text-white flex items-center justify-center font-bold text-sm tracking-tight shadow-md shadow-accent/20 group-hover:scale-105 group-hover:shadow-accent/40 transition-all duration-200">
+            <div className="w-8 h-8 rounded-xl bg-linear-to-tr from-accent via-blue-500 to-sky-400 text-white flex items-center justify-center font-bold text-sm tracking-tight shadow-md shadow-accent/20 group-hover:scale-105 group-hover:shadow-accent/40 transition-all duration-200">
               SF
             </div>
             <div className="flex items-center gap-2">

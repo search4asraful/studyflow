@@ -1,19 +1,18 @@
 'use client';
 
-import React from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { Input } from '../../components/ui/Input';
-import { Button } from '../../components/ui/Button';
-import { ThemeToggle } from '../../components/ui/ThemeToggle';
-import { useAuthStore } from '../../stores/authStore';
-import { apiRequest } from '../../lib/api';
 import { toast } from 'sonner';
-import { ArrowLeft, Sparkles } from 'lucide-react';
+import { z } from 'zod';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
+import { ThemeToggle } from '../../components/ui/ThemeToggle';
+import { apiRequest } from '../../lib/api';
 import { triggerConfetti } from '../../lib/confetti';
+import { useAuthStore } from '../../stores/authStore';
 
 const registerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(50),
@@ -69,7 +68,7 @@ export default function RegisterPage() {
       </div>
 
       <Link href="/" className="flex items-center gap-2.5 mb-8 group relative z-10">
-        <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-accent via-blue-500 to-sky-400 text-white flex items-center justify-center font-bold text-base shadow-lg shadow-accent/25 group-hover:scale-105 transition-all">
+        <div className="w-10 h-10 rounded-2xl bg-linear-to-tr from-accent via-blue-500 to-sky-400 text-white flex items-center justify-center font-bold text-base shadow-lg shadow-accent/25 group-hover:scale-105 transition-all">
           SF
         </div>
         <span className="font-bold text-2xl tracking-tight text-foreground">StudyFlow</span>

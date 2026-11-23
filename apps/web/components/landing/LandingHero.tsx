@@ -1,29 +1,29 @@
 'use client';
 
-import React, { useRef, useState, useEffect } from 'react';
-import Link from 'next/link';
 import { useGSAP } from '@gsap/react';
 import gsap from 'gsap';
-import { Button } from '../ui/Button';
 import {
-  ArrowRight,
-  Sparkles,
-  CheckCircle2,
-  Play,
-  Pause,
-  RotateCcw,
-  Volume2,
-  Zap,
-  Activity,
-  Layers,
-  Radio,
-  Clock,
-  ShieldCheck,
+    Activity,
+    ArrowRight,
+    CheckCircle2,
+    Clock,
+    Layers,
+    Pause,
+    Play,
+    Radio,
+    RotateCcw,
+    ShieldCheck,
+    Sparkles,
+    Volume2,
+    Zap,
 } from 'lucide-react';
-import { useAuthStore } from '../../stores/authStore';
+import Link from 'next/link';
+import React, { useEffect, useRef, useState } from 'react';
 import { playTaskCompletionSound } from '../../lib/audio';
 import { triggerConfetti } from '../../lib/confetti';
 import { cn } from '../../lib/utils';
+import { useAuthStore } from '../../stores/authStore';
+import { Button } from '../ui/Button';
 
 export const LandingHero: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -145,7 +145,7 @@ export const LandingHero: React.FC = () => {
       className="relative pt-12 pb-20 md:pt-20 md:pb-32 overflow-hidden selection:bg-accent selection:text-white"
     >
       {/* Dynamic Ambient Background Glow Mesh */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[650px] sm:w-[850px] h-[500px] bg-gradient-to-tr from-accent/20 via-blue-500/10 to-sky-400/5 rounded-full blur-[140px] pointer-events-none" />
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[650px] sm:w-[850px] h-[500px] bg-linear-to-tr from-accent/20 via-blue-500/10 to-sky-400/5 rounded-full blur-[140px] pointer-events-none" />
       <div className="absolute top-1/3 left-1/4 -translate-x-1/2 w-80 h-80 bg-accent/10 rounded-full blur-[100px] pointer-events-none" />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 text-center relative z-10">
@@ -164,7 +164,7 @@ export const LandingHero: React.FC = () => {
         {/* Hero Title */}
         <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-foreground max-w-4xl mx-auto leading-[1.08]">
           <span className="hero-title-line block">Make every study</span>
-          <span className="hero-title-line block bg-clip-text text-transparent bg-gradient-to-r from-accent via-blue-500 to-sky-400">
+          <span className="hero-title-line block bg-clip-text text-transparent bg-linear-to-r from-accent via-blue-500 to-sky-400">
             session count.
           </span>
         </h1>

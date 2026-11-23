@@ -1,29 +1,28 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
-import Link from 'next/link';
-import { AppShell } from '../../components/layout/AppShell';
-import { apiRequest } from '../../lib/api';
 import { Task, TaskStatus } from '@studyflow/shared';
+import { format } from 'date-fns';
+import {
+    ArrowRight,
+    CheckCircle2,
+    Circle,
+    Clock,
+    LayoutGrid,
+    List as ListIcon,
+    Loader2,
+    Search,
+    Sparkles
+} from 'lucide-react';
+import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
+import { AppShell } from '../../components/layout/AppShell';
+import { TaskCard } from '../../components/tasks/TaskCard';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import {
-  CheckCircle2,
-  Circle,
-  Clock,
-  Loader2,
-  ArrowRight,
-  Search,
-  Filter,
-  LayoutGrid,
-  List as ListIcon,
-  Sparkles,
-} from 'lucide-react';
-import { format } from 'date-fns';
-import { toast } from 'sonner';
-import { triggerConfetti } from '../../lib/confetti';
+import { apiRequest } from '../../lib/api';
 import { playTaskCompletionSound } from '../../lib/audio';
-import { TaskCard } from '../../components/tasks/TaskCard';
+import { triggerConfetti } from '../../lib/confetti';
 
 const COLUMNS: { id: TaskStatus; title: string; color: string }[] = [
   { id: 'BACKLOG', title: 'Backlog', color: 'bg-zinc-400' },
@@ -206,7 +205,7 @@ export default function MyTasksPage() {
           {/* Progress bar */}
           <div className="w-full h-1.5 bg-surface-elevated rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-accent to-emerald-400 transition-all duration-500 rounded-full"
+              className="h-full bg-linear-to-r from-accent to-emerald-400 transition-all duration-500 rounded-full"
               style={{ width: `${progressPercent}%` }}
             />
           </div>

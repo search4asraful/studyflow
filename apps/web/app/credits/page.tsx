@@ -160,7 +160,7 @@ export default function CreditsPage() {
               >
                 <div>
                   <div className="flex items-center gap-4 mb-4">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-accent to-sky-400 text-white font-mono font-bold text-base flex items-center justify-center shadow-md">
+                    <div className="w-12 h-12 rounded-2xl bg-linear-to-tr from-accent to-sky-400 text-white font-mono font-bold text-base flex items-center justify-center shadow-md">
                       {member.initials}
                     </div>
                     <div>

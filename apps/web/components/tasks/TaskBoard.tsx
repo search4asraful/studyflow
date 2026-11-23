@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
 import { Task, TaskStatus } from '@studyflow/shared';
-import { TaskCard } from './TaskCard';
-import { Button } from '../ui/Button';
-import { Plus, Search, Filter, CheckCircle2 } from 'lucide-react';
-import { triggerConfetti } from '../../lib/confetti';
+import { CheckCircle2, Filter, Plus, Search } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
 import { playTaskCompletionSound } from '../../lib/audio';
+import { triggerConfetti } from '../../lib/confetti';
+import { Button } from '../ui/Button';
+import { TaskCard } from './TaskCard';
 
 interface TaskBoardProps {
   tasks: Task[];
@@ -110,7 +110,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
             </div>
             <div className="w-full h-1.5 bg-surface-elevated rounded-full overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-accent to-emerald-400 transition-all duration-500 rounded-full"
+                className="h-full bg-linear-to-r from-accent to-emerald-400 transition-all duration-500 rounded-full"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
@@ -126,7 +126,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
           return (
             <div
               key={col.id}
-              className="flex flex-col bg-surface/90 backdrop-blur-md border border-border rounded-2xl p-3.5 min-h-[420px] shadow-xs"
+              className="flex flex-col bg-surface/90 backdrop-blur-md border border-border rounded-2xl p-3.5 min-h-105 shadow-xs"
             >
               {/* Column Header */}
               <div className="flex items-center justify-between mb-3">
