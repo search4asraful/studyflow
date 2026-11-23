@@ -7,6 +7,7 @@ import { Navbar } from './Navbar';
 import { Sidebar } from './Sidebar';
 import { MobileNav } from './MobileNav';
 import { Loader2 } from 'lucide-react';
+import { cn } from '../../lib/utils';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -48,15 +49,20 @@ export const AppShell: React.FC<AppShellProps> = ({ children, fullWidth = false 
   }
 
   return (
-    <div className="min-h-screen bg-canvas text-foreground flex flex-col transition-colors duration-200">
+    <div
+      className={cn(
+        'min-h-screen bg-canvas text-foreground flex flex-col transition-colors duration-200',
+        fullWidth && 'h-screen overflow-hidden'
+      )}
+    >
       <Navbar variant="admin" />
-      <div className="flex-1 flex">
+      <div className="flex-1 flex min-h-0 overflow-hidden">
         <Sidebar />
-        <div className="flex-1 md:pl-64 flex flex-col min-w-0">
+        <div className="flex-1 md:pl-64 flex flex-col min-w-0 min-h-0 overflow-hidden">
           <main
             className={
               fullWidth
-                ? 'flex-1 p-3 sm:p-4 md:p-6 pb-20 md:pb-6 w-full flex flex-col'
+                ? 'flex-1 p-2 sm:p-3 md:p-3.5 pb-20 md:pb-3.5 w-full flex flex-col min-h-0 overflow-hidden'
                 : 'flex-1 p-4 sm:p-6 md:p-8 pb-20 md:pb-8 max-w-7xl mx-auto w-full overflow-x-hidden'
             }
           >

@@ -18,6 +18,7 @@ import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { cn } from '../../lib/utils';
 import { format } from 'date-fns';
+import { playChatSound } from '../../lib/audio';
 
 export interface WorkspaceMember {
   id: string;
@@ -139,7 +140,7 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
   // Group room chat messages (clean real-time feed)
   const [roomMessages, setRoomMessages] = useState<ChatMessageItem[]>([]);
 
-  // Private 1-on-1 threads isolated per member ID (handled purely in-memory via socket)
+  // Private 1-on-1 threads isolated per member ID
   const [privateThreads, setPrivateThreads] = useState<Record<string, ChatMessageItem[]>>({});
 
   // Chat input string
@@ -149,16 +150,42 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
 
+  // Incoming message indicators
+  const [unreadRoomCount, setUnreadRoomCount] = useState<number>(0);
+  const [unreadDirect, setUnreadDirect] = useState<Record<string, number>>({});
+  const [incomingDirectAlert, setIncomingDirectAlert] = useState<{
+    senderId: string;
+    senderName: string;
+    content: string;
+  } | null>(null);
+
+  const isInitialMountRef = useRef(true);
+  const processedActivityIdsRef = useRef<Set<string>>(new Set());
+
+  // Total direct unread across all members
+  const totalUnreadDirect = useMemo(
+    () => Object.values(unreadDirect).reduce((sum, count) => sum + count, 0),
+    [unreadDirect]
+  );
+
   // Sync incoming socket activities and chat messages into room feed without duplicates
   useEffect(() => {
     if (!incomingActivities || incomingActivities.length === 0) return;
+
+    const isInitial = isInitialMountRef.current;
+    if (isInitial) {
+      incomingActivities.forEach((act) => processedActivityIdsRef.current.add(act.id));
+      isInitialMountRef.current = false;
+    }
 
     setRoomMessages((prev) => {
       let updated = [...prev];
       let hasChanges = false;
 
       for (const act of incomingActivities) {
-        // Skip if this exact activity ID is already present
+        const isNewActivity = !processedActivityIdsRef.current.has(act.id);
+        processedActivityIdsRef.current.add(act.id);
+
         if (updated.some((m) => m.id === act.id)) {
           continue;
         }
@@ -167,9 +194,51 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
           const isFromMe = act.userId === currentUser.id;
           const otherUserId = isFromMe ? act.recipientId : act.userId;
           if (otherUserId) {
+            const messageText = act.details || '';
+            const actTime = new Date(act.createdAt).getTime();
+
+            // Audio chime & indicator for new incoming direct message from someone else
+            if (isNewActivity && !isFromMe) {
+              playChatSound();
+
+              if (!privateChatMember || privateChatMember.id !== act.userId) {
+                setUnreadDirect((prevUnread) => ({
+                  ...prevUnread,
+                  [otherUserId]: (prevUnread[otherUserId] || 0) + 1,
+                }));
+
+                setIncomingDirectAlert({
+                  senderId: otherUserId,
+                  senderName: act.userName,
+                  content: messageText,
+                });
+              }
+            }
+
             setPrivateThreads((prevThreads) => {
-              const list = prevThreads[otherUserId] || [];
+              const list = [...(prevThreads[otherUserId] || [])];
               if (list.some((m) => m.id === act.id)) return prevThreads;
+
+              // Reconcile optimistic message sent by me to eliminate duplication
+              const optimisticIndex = list.findIndex(
+                (m) =>
+                  m.content.trim() === messageText.trim() &&
+                  (m.senderId === currentUser.id || m.senderName === act.userName) &&
+                  Math.abs(new Date(m.timestamp).getTime() - actTime) < 15000
+              );
+
+              if (optimisticIndex !== -1) {
+                list[optimisticIndex] = {
+                  ...list[optimisticIndex],
+                  id: act.id,
+                  timestamp: act.createdAt,
+                };
+                return {
+                  ...prevThreads,
+                  [otherUserId]: list,
+                };
+              }
+
               return {
                 ...prevThreads,
                 [otherUserId]: [
@@ -178,7 +247,7 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
                     id: act.id,
                     senderId: act.userId || 'participant',
                     senderName: act.userName,
-                    content: act.details || '',
+                    content: messageText,
                     timestamp: act.createdAt,
                     type: 'chat',
                   },
@@ -192,8 +261,16 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
         if (act.action === 'CHAT_MESSAGE') {
           const messageText = act.details || '';
           const actTime = new Date(act.createdAt).getTime();
+          const isFromMe = act.userId === currentUser.id;
 
-          // Check if there is an optimistic local message with the same content sent recently
+          // Audio chime & indicator for new room messages from others
+          if (isNewActivity && !isFromMe) {
+            playChatSound();
+            if (activeTab !== 'chat' || privateChatMember !== null) {
+              setUnreadRoomCount((c) => c + 1);
+            }
+          }
+
           const optimisticIndex = updated.findIndex(
             (m) =>
               m.type === 'chat' &&
@@ -203,7 +280,6 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
           );
 
           if (optimisticIndex !== -1) {
-            // Reconcile optimistic ID with the server activity ID (prevents double message!)
             updated[optimisticIndex] = {
               ...updated[optimisticIndex],
               id: act.id,
@@ -211,7 +287,6 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
             };
             hasChanges = true;
           } else {
-            // Message from another participant: render as a real chat bubble
             updated.push({
               id: act.id,
               senderId: act.userId || 'participant',
@@ -223,7 +298,6 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
             hasChanges = true;
           }
         } else {
-          // Non-chat system activity announcement (timer phase, tasks, joins)
           let cleanText = '';
           if (act.details) {
             cleanText = act.details.startsWith(act.userName)
@@ -248,9 +322,9 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
 
       return hasChanges ? updated : prev;
     });
-  }, [incomingActivities, currentUser.id]);
+  }, [incomingActivities, currentUser.id, privateChatMember, activeTab]);
 
-  // Chronological Auto-scroll to bottom whenever messages update
+  // Auto-scroll to bottom whenever messages update
   useEffect(() => {
     if (feedScrollRef.current) {
       feedScrollRef.current.scrollTo({
@@ -260,29 +334,48 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
     }
   }, [roomMessages, privateThreads, privateChatMember, activeTab]);
 
-  // Animate view transition when switching between Room Chat and 1-on-1 Private Chat
   const handleOpenPrivateChat = (member: WorkspaceMember) => {
     setActiveTab('chat');
     setPrivateChatMember(member);
 
+    // Clear unread for this member
+    setUnreadDirect((prev) => {
+      if (!prev[member.id]) return prev;
+      const updated = { ...prev };
+      delete updated[member.id];
+      return updated;
+    });
+
+    if (incomingDirectAlert?.senderId === member.id) {
+      setIncomingDirectAlert(null);
+    }
+
     if (contentAreaRef.current) {
       gsap.fromTo(
         contentAreaRef.current,
-        { opacity: 0, x: 12 },
-        { opacity: 1, x: 0, duration: 0.25, ease: 'power2.out' }
+        { opacity: 0, x: 10 },
+        { opacity: 1, x: 0, duration: 0.2, ease: 'power2.out' }
       );
     }
   };
 
   const handleBackToRoomChat = () => {
     setPrivateChatMember(null);
+    setUnreadRoomCount(0);
 
     if (contentAreaRef.current) {
       gsap.fromTo(
         contentAreaRef.current,
-        { opacity: 0, x: -12 },
-        { opacity: 1, x: 0, duration: 0.25, ease: 'power2.out' }
+        { opacity: 0, x: -10 },
+        { opacity: 1, x: 0, duration: 0.2, ease: 'power2.out' }
       );
+    }
+  };
+
+  const handleSelectChatTab = () => {
+    setActiveTab('chat');
+    if (!privateChatMember) {
+      setUnreadRoomCount(0);
     }
   };
 
@@ -306,7 +399,6 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
     setMentionQuery(null);
   };
 
-  // Filter mentionable members
   const allWorkspaceMembers = useMemo(
     () => [currentUser, ...activeMembers],
     [currentUser, activeMembers]
@@ -324,13 +416,12 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
     [mentionQuery, allWorkspaceMembers]
   );
 
-  // Animate mention popover opening
   useGSAP(
     () => {
       if (mentionQuery !== null && mentionPopoverRef.current) {
         gsap.fromTo(
           mentionPopoverRef.current,
-          { opacity: 0, y: 6, scale: 0.97 },
+          { opacity: 0, y: 4, scale: 0.98 },
           { opacity: 1, y: 0, scale: 1, duration: 0.15, ease: 'power2.out' }
         );
       }
@@ -363,7 +454,6 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
     }
   };
 
-  // Keyboard navigation for chat input and mention popover
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (mentionQuery !== null && filteredMentionMembers.length > 0) {
       if (e.key === 'ArrowDown') {
@@ -429,7 +519,6 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
     handleSend(emoji);
   };
 
-  // Helper to format chat message text and render @mentions as compact pills
   const renderMessageContent = (text: string) => {
     const parts = text.split(/(@[A-Za-z0-9 ._-]+)/g);
 
@@ -471,13 +560,13 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
     <div
       ref={panelRef}
       className={cn(
-        'card-glass flex flex-col h-full rounded-2xl border border-border bg-surface/90 backdrop-blur-xl shadow-lg overflow-hidden relative transition-colors duration-200',
+        'flex flex-col h-full min-h-0 rounded-2xl border border-border/80 bg-surface/90 backdrop-blur-xl shadow-xs overflow-hidden relative transition-colors duration-200',
         className
       )}
     >
-      {/* Compact Top Header Strip */}
+      {/* Streamlined Header */}
       {privateChatMember ? (
-        <div className="flex items-center justify-between px-3 py-2 bg-surface-elevated/80 border-b border-border shrink-0">
+        <div className="flex items-center justify-between px-3 py-2 bg-surface-elevated/70 border-b border-border/80 shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <button
               onClick={handleBackToRoomChat}
@@ -522,132 +611,202 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
           </button>
         </div>
       ) : (
-        <div className="px-2.5 py-2 bg-surface-elevated/70 border-b border-border shrink-0">
-          {/* Streamlined Compact Tab Navigation */}
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1 p-0.5 bg-surface-subtle rounded-lg border border-border flex-1">
-              <button
-                onClick={() => setActiveTab('chat')}
-                className={cn(
-                  'flex-1 py-1 px-2 rounded-md text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer',
-                  activeTab === 'chat'
-                    ? 'bg-accent text-white shadow-sm'
-                    : 'text-foreground-muted hover:text-foreground'
-                )}
-              >
-                <MessageSquare className="w-3 h-3" />
-                <span>Chat</span>
-                {chatMessagesCount > 0 && (
-                  <span className="text-[9px] font-mono px-1 py-0.2 rounded-full bg-black/20 text-white">
-                    {chatMessagesCount}
-                  </span>
-                )}
-              </button>
+        <div className="px-2.5 py-2 bg-surface-elevated/60 border-b border-border/80 shrink-0">
+          {/* Segmented Control using full width */}
+          <div className="flex items-center gap-1 p-0.5 bg-surface-subtle rounded-xl border border-border/60 w-full">
+            <button
+              type="button"
+              onClick={handleSelectChatTab}
+              className={cn(
+                'flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer relative',
+                activeTab === 'chat' && !privateChatMember
+                  ? 'bg-accent text-white shadow-xs'
+                  : 'text-foreground-muted hover:text-foreground'
+              )}
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>Room Chat</span>
+              {unreadRoomCount > 0 && (activeTab !== 'chat' || privateChatMember !== null) ? (
+                <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-rose-500 text-white animate-pulse">
+                  +{unreadRoomCount}
+                </span>
+              ) : chatMessagesCount > 0 ? (
+                <span
+                  className={cn(
+                    'text-[9px] font-mono px-1.5 py-0.2 rounded-full',
+                    activeTab === 'chat' && !privateChatMember
+                      ? 'bg-black/25 text-white'
+                      : 'bg-surface-elevated text-foreground-muted border border-border/60'
+                  )}
+                >
+                  {chatMessagesCount}
+                </span>
+              ) : null}
+            </button>
 
-              <button
-                onClick={() => setActiveTab('members')}
-                className={cn(
-                  'flex-1 py-1 px-2 rounded-md text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer',
-                  activeTab === 'members'
-                    ? 'bg-accent text-white shadow-sm'
-                    : 'text-foreground-muted hover:text-foreground'
-                )}
-              >
-                <Users className="w-3 h-3" />
-                <span>Members ({activeMembers.length})</span>
-              </button>
-            </div>
-
-            {/* Live Indicator Pill */}
-            <span className="flex items-center gap-1 text-emerald-400 text-[10px] font-mono font-medium px-1.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 shrink-0">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Live
-            </span>
+            <button
+              type="button"
+              onClick={() => setActiveTab('members')}
+              className={cn(
+                'flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer relative',
+                activeTab === 'members'
+                  ? 'bg-accent text-white shadow-xs'
+                  : 'text-foreground-muted hover:text-foreground'
+              )}
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>Members ({activeMembers.length + 1})</span>
+              {totalUnreadDirect > 0 && (
+                <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-rose-500 text-white animate-pulse">
+                  +{totalUnreadDirect}
+                </span>
+              )}
+            </button>
           </div>
         </div>
       )}
 
       {/* Main Panel Content Area */}
       <div ref={contentAreaRef} className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        {/* Incoming Direct Message Notification Banner */}
+        {incomingDirectAlert && (
+          <div className="mx-2.5 mt-2 mb-1 p-2 rounded-xl bg-accent/10 border border-accent/30 text-foreground flex items-center justify-between gap-2 shadow-2xs shrink-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="relative flex h-2 w-2 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-accent" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold text-foreground truncate">
+                  {incomingDirectAlert.senderName}
+                </p>
+                <p className="text-[10px] text-foreground-muted truncate max-w-[180px]">
+                  {incomingDirectAlert.content}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  const sender = allWorkspaceMembers.find(
+                    (m) => m.id === incomingDirectAlert.senderId
+                  );
+                  if (sender) handleOpenPrivateChat(sender);
+                  setIncomingDirectAlert(null);
+                }}
+                className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-accent text-white hover:bg-accent-hover transition-colors cursor-pointer"
+              >
+                Reply
+              </button>
+              <button
+                type="button"
+                onClick={() => setIncomingDirectAlert(null)}
+                className="p-1 text-foreground-muted hover:text-foreground rounded transition-colors cursor-pointer"
+                title="Dismiss"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'members' && !privateChatMember ? (
-          /* Members Tab: Compact List View with 1-on-1 Chat triggers */
-          <div className="flex-1 overflow-y-auto p-2.5 space-y-1.5">
+          /* Members List */
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
             <div className="px-1 py-0.5 flex items-center justify-between text-[10px] font-mono text-foreground-muted uppercase tracking-wider">
               <span>Active Participants</span>
               <span>{activeMembers.length + 1} online</span>
             </div>
 
-            {activeMembers.map((member) => (
-              <div
-                key={member.id}
-                className="group flex items-center justify-between p-1.5 px-2 rounded-xl bg-surface-elevated/60 hover:bg-surface-elevated border border-border/80 hover:border-accent/40 transition-all duration-150"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="relative shrink-0">
-                    {member.avatarUrl ? (
-                      <img
-                        src={member.avatarUrl}
-                        alt={member.name}
-                        className="w-6 h-6 rounded-full object-cover border border-border"
-                      />
-                    ) : (
-                      <div className="w-6 h-6 rounded-full bg-accent/20 border border-accent/40 text-accent flex items-center justify-center font-bold text-[10px]">
-                        {(member.name || 'M').charAt(0)}
-                      </div>
-                    )}
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 ring-1 ring-surface-elevated absolute -bottom-0.5 -right-0.5" />
-                  </div>
-
-                  <div className="min-w-0">
-                    <h4 className="text-xs font-semibold text-foreground truncate leading-tight">
-                      {member.name}
-                    </h4>
-                    <p className="text-[10px] text-foreground-muted truncate leading-tight">
-                      {member.title}
-                    </p>
-                  </div>
-                </div>
-
-                <Button
-                  onClick={() => handleOpenPrivateChat(member)}
-                  size="sm"
-                  variant="outline"
-                  className="h-6 px-2 text-[10px] rounded-lg border-border hover:border-accent text-accent hover:bg-accent hover:text-white transition-all cursor-pointer shrink-0 gap-1 font-medium"
-                  title={`Direct message ${member.name}`}
+            {/* Member Cards */}
+            {activeMembers.map((member) => {
+              const unreadCount = unreadDirect[member.id] || 0;
+              return (
+                <div
+                  key={member.id}
+                  className="group flex items-center justify-between p-2 rounded-xl bg-surface-elevated/60 hover:bg-surface-elevated border border-border/80 hover:border-accent/40 transition-all duration-150"
                 >
-                  <MessageSquare className="w-2.5 h-2.5" />
-                  <span>Chat</span>
-                </Button>
-              </div>
-            ))}
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="relative shrink-0">
+                      {member.avatarUrl ? (
+                        <img
+                          src={member.avatarUrl}
+                          alt={member.name}
+                          className="w-7 h-7 rounded-lg object-cover border border-border"
+                        />
+                      ) : (
+                        <div className="w-7 h-7 rounded-lg bg-accent/20 border border-accent/40 text-accent flex items-center justify-center font-bold text-xs">
+                          {(member.name || 'M').charAt(0)}
+                        </div>
+                      )}
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-surface-elevated absolute -bottom-0.5 -right-0.5" />
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <h4 className="text-xs font-semibold text-foreground truncate leading-tight">
+                          {member.name}
+                        </h4>
+                        {unreadCount > 0 && (
+                          <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-rose-500 text-white animate-pulse">
+                            {unreadCount} new
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-foreground-muted truncate leading-tight mt-0.5">
+                        {member.title}
+                      </p>
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={() => handleOpenPrivateChat(member)}
+                    size="sm"
+                    variant={unreadCount > 0 ? 'primary' : 'outline'}
+                    className={cn(
+                      'h-7 px-2.5 text-[10px] rounded-lg transition-all cursor-pointer shrink-0 gap-1 font-medium',
+                      unreadCount > 0
+                        ? 'bg-accent text-white hover:bg-accent-hover shadow-xs'
+                        : 'border-border hover:border-accent text-accent hover:bg-accent hover:text-white'
+                    )}
+                    title={`Direct message ${member.name}`}
+                  >
+                    <MessageSquare className="w-3 h-3" />
+                    <span>{unreadCount > 0 ? 'Reply' : 'Chat'}</span>
+                  </Button>
+                </div>
+              );
+            })}
 
             {/* Current User Card */}
-            <div className="pt-2 mt-2 border-t border-border-subtle">
-              <div className="flex items-center justify-between p-1.5 px-2 rounded-xl bg-surface-subtle/80 border border-border/60">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-6 h-6 rounded-full bg-accent/20 border border-accent/40 flex items-center justify-center text-[10px] text-accent font-bold shrink-0">
+            <div className="pt-2 mt-2 border-t border-border/60">
+              <div className="flex items-center justify-between p-2 rounded-xl bg-surface-subtle/80 border border-border/60">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-7 h-7 rounded-lg bg-accent/20 border border-accent/40 flex items-center justify-center text-xs text-accent font-bold shrink-0">
                     {(currentUser.name || 'U').charAt(0)}
                   </div>
                   <div className="min-w-0">
                     <h4 className="text-xs font-semibold text-foreground truncate leading-tight">
                       {currentUser.name} (You)
                     </h4>
-                    <p className="text-[10px] text-foreground-muted truncate leading-tight">
+                    <p className="text-[10px] text-foreground-muted truncate leading-tight mt-0.5">
                       {currentUser.title}
                     </p>
                   </div>
                 </div>
-                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30 font-semibold">
-                  {currentUser.role}
+                <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30 font-semibold">
+                  Host
                 </span>
               </div>
             </div>
           </div>
         ) : (
-          /* Chronological Chat Feed with High-Density Layout & Message Grouping */
+          /* Chronological Chat Feed */
           <div
             ref={feedScrollRef}
-            className="flex-1 overflow-y-auto px-3 py-2 space-y-1.5 min-h-0"
+            className="flex-1 overflow-y-auto px-3 py-2 space-y-2 min-h-0"
           >
             {activeMessages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full min-h-[140px] text-center text-foreground-muted space-y-1.5 py-6">
@@ -656,10 +815,10 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
                 </div>
                 <p className="text-xs font-medium text-foreground-secondary">
                   {privateChatMember
-                    ? `Start a 1:1 direct chat with ${privateChatMember.name}`
-                    : 'No messages in this room yet'}
+                    ? `Direct chat with ${privateChatMember.name}`
+                    : 'No messages yet'}
                 </p>
-                <p className="text-[11px] text-foreground-muted max-w-[220px]">
+                <p className="text-[11px] text-foreground-muted max-w-[200px]">
                   Send a live note, reaction, or mention someone with @
                 </p>
               </div>
@@ -668,7 +827,6 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
                 const isMe = msg.senderId === currentUser.id;
                 const prevMsg = index > 0 ? activeMessages[index - 1] : null;
 
-                // Group consecutive messages from the same sender within 2 minutes
                 const isSameSenderAsPrev =
                   !msg.isSystem &&
                   !prevMsg?.isSystem &&
@@ -677,11 +835,8 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
 
                 if (msg.isSystem) {
                   return (
-                    <div
-                      key={msg.id}
-                      className="flex items-center justify-center my-1.5"
-                    >
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-subtle border border-border-subtle text-[10px] font-mono text-foreground-muted max-w-[95%]">
+                    <div key={msg.id} className="flex items-center justify-center my-1.5">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-subtle border border-border/60 text-[10px] font-mono text-foreground-muted max-w-[95%]">
                         <Sparkles className="w-2.5 h-2.5 text-accent shrink-0" />
                         <span className="truncate">{msg.content}</span>
                         <span className="text-foreground-muted/60 shrink-0">
@@ -696,12 +851,11 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
                   <div
                     key={msg.id}
                     className={cn(
-                      'flex flex-col max-w-[88%]',
+                      'flex flex-col max-w-[85%]',
                       isMe ? 'ml-auto items-end' : 'mr-auto items-start',
                       isSameSenderAsPrev ? 'mt-0.5' : 'mt-2'
                     )}
                   >
-                    {/* Sender Name & Timestamp (only shown on the first message of a group) */}
                     {!isSameSenderAsPrev && (
                       <div className="flex items-center gap-1.5 text-[10px] font-mono text-foreground-muted px-1 mb-0.5">
                         <span className={cn('font-semibold', isMe ? 'text-accent' : 'text-foreground-secondary')}>
@@ -712,13 +866,12 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
                       </div>
                     )}
 
-                    {/* Chat Bubble with tight compact styling */}
                     <div
                       className={cn(
-                        'rounded-xl px-2.5 py-1.5 text-xs leading-relaxed shadow-xs transition-all break-words',
+                        'rounded-2xl px-3 py-1.5 text-xs leading-relaxed shadow-2xs transition-all break-words',
                         isMe
                           ? 'bg-accent text-white rounded-tr-xs shadow-accent/20'
-                          : 'bg-surface-elevated text-foreground rounded-tl-xs border border-border'
+                          : 'bg-surface-elevated text-foreground rounded-tl-xs border border-border/80'
                       )}
                     >
                       {renderMessageContent(msg.content)}
@@ -735,7 +888,7 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
       {mentionQuery !== null && filteredMentionMembers.length > 0 && (
         <div
           ref={mentionPopoverRef}
-          className="absolute bottom-full mb-1.5 inset-x-2.5 bg-surface-elevated border border-accent/40 rounded-xl shadow-2xl p-1 z-30 space-y-0.5 backdrop-blur-xl"
+          className="absolute bottom-full mb-1.5 inset-x-3 bg-surface-elevated border border-accent/40 rounded-xl shadow-2xl p-1 z-30 space-y-0.5 backdrop-blur-xl"
         >
           <div className="px-2 py-1 border-b border-border flex items-center justify-between text-[9px] font-mono text-foreground-muted">
             <span>MENTION MEMBER</span>
@@ -776,8 +929,8 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
         </div>
       )}
 
-      {/* Compact Bottom Message Input Strip */}
-      <div className="p-2 bg-surface-elevated/70 border-t border-border shrink-0 space-y-1.5">
+      {/* Bottom Message Input Strip */}
+      <div className="p-2.5 bg-surface-elevated/70 border-t border-border/80 shrink-0 space-y-2">
         {/* Quick Reaction Emojis & Hint */}
         <div className="flex items-center justify-between px-0.5">
           <div className="flex items-center gap-1">
@@ -786,7 +939,7 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
                 key={emoji}
                 type="button"
                 onClick={() => handleQuickReaction(emoji)}
-                className="w-6 h-6 rounded-md bg-surface-subtle hover:bg-surface-elevated active:scale-90 border border-border flex items-center justify-center text-xs transition-transform cursor-pointer"
+                className="w-6 h-6 rounded-lg bg-surface-subtle hover:bg-surface-elevated active:scale-90 border border-border/80 flex items-center justify-center text-xs transition-transform cursor-pointer"
                 title={`React ${emoji}`}
               >
                 {emoji}
@@ -799,8 +952,8 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
           </span>
         </div>
 
-        {/* Input & Send Form in one streamlined row */}
-        <div className="flex items-center gap-1.5">
+        {/* Input & Send Form */}
+        <div className="flex items-center gap-2">
           <div className="relative flex-1">
             <input
               ref={inputRef}
@@ -808,25 +961,24 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
               placeholder={
                 privateChatMember
                   ? `Message ${privateChatMember.name.split(' ')[0]}...`
-                  : 'Message or @mention...'
+                  : 'Message room or @mention...'
               }
               value={inputText}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
-              className="w-full h-8 px-2.5 rounded-lg bg-surface-subtle border border-border focus:border-accent text-xs text-foreground placeholder:text-foreground-muted focus:outline-none transition-colors"
+              className="w-full h-9 px-3 rounded-xl bg-surface-subtle border border-border/80 focus:border-accent text-xs text-foreground placeholder:text-foreground-muted focus:outline-hidden transition-colors"
             />
           </div>
 
-          <Button
+          <button
             type="button"
             onClick={() => handleSend()}
             disabled={!inputText.trim()}
-            size="sm"
-            className="h-8 w-8 p-0 rounded-lg bg-accent hover:bg-accent-hover disabled:opacity-40 text-white shrink-0 cursor-pointer transition-all flex items-center justify-center shadow-xs"
+            className="h-9 w-9 rounded-xl bg-accent hover:bg-accent-hover disabled:opacity-40 text-white shrink-0 cursor-pointer transition-all flex items-center justify-center shadow-xs active:scale-95"
             title="Send"
           >
             <Send className="w-3.5 h-3.5" />
-          </Button>
+          </button>
         </div>
       </div>
     </div>
