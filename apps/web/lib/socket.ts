@@ -17,17 +17,15 @@ export function getSocket(): Socket {
     });
 
     socket.on('connect', () => {
-      // console.log('[Socket] Connected to server, ID:', socket?.id);
+      // Connected to server
     });
 
     socket.on('disconnect', (_reason) => {
       // Disconnected from server
     });
 
-    socket.on('connect_error', (error) => {
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn('[Socket] Connection error:', error.message);
-      }
+    socket.on('connect_error', () => {
+      // Handled silently without console exposure
     });
   }
 

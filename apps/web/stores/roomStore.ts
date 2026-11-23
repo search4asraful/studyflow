@@ -40,16 +40,21 @@ export const useRoomStore = create<RoomState>((set) => ({
   isLoading: true,
   error: null,
 
-  setRoomState: (payload) =>
-    set({
+  setRoomState: (payload) => {
+    // Sort activities chronologically (oldest at top, newest at bottom)
+    const sortedActivities = [...(payload.recentActivities || [])].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+    return set({
       room: payload.room,
       role: payload.role,
       members: payload.members,
       tasks: payload.tasks,
-      activities: payload.recentActivities || [],
+      activities: sortedActivities,
       isLoading: false,
       error: null,
-    }),
+    });
+  },
 
   updateMemberOnlineStatus: (userId, isOnline) =>
     set((state) => ({
@@ -98,9 +103,14 @@ export const useRoomStore = create<RoomState>((set) => ({
     })),
 
   addActivity: (activity) =>
-    set((state) => ({
-      activities: [activity, ...state.activities.slice(0, 30)],
-    })),
+    set((state) => {
+      // Deduplicate by ID
+      if (state.activities.some((a) => a.id === activity.id)) return state;
+      return {
+        // Append newest message to the bottom
+        activities: [...state.activities.slice(-60), activity],
+      };
+    }),
 
   clearRoom: () =>
     set({

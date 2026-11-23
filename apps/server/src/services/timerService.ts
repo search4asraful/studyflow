@@ -454,8 +454,8 @@ export class TimerService {
           } else {
             this.activeRunningRooms.delete(roomId);
           }
-        } catch (err) {
-          console.error(`[TimerTicker] Error ticking room ${roomId}:`, err);
+        } catch {
+          // Handled safely without leaking internal errors
         }
       }
     }, 1000);

@@ -27,7 +27,7 @@
   --color-palette-blue: #3f72af;
   --color-palette-navy: #112d4e;
 
-  --color-dark-bg: #0e233d;
+  --color-dark-bg: #0b1a2f;
   --color-dark-surface: #112d4e;
   --color-dark-elevated: #1b3e69;
   --color-dark-border: #1e4575;
@@ -48,61 +48,57 @@
   --color-light-accent-hover: #325e93;
 
   --font-sans:
-    var(--font-inter), -apple-system, BlinkMacSystemFont, Segoe UI, Roboto,
+    var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
     sans-serif;
   --font-editorial: var(--font-serif), Georgia, serif;
   --font-mono: var(--font-mono), monospace;
 
   --animate-pulse-subtle: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-shimmer: shimmer 2.5s infinite linear;
 }
 
-/*
-  The default border color has changed to `currentcolor` in Tailwind CSS v4,
-  so we've added these compatibility styles to make sure everything still
-  looks the same as it did with Tailwind CSS v3.
-
-  If we ever want to remove these styles, we need to add an explicit border
-  color utility to any element that depends on these defaults.
-*/
 @layer base {
   *,
   ::after,
   ::before,
   ::backdrop,
   ::file-selector-button {
-    border-color: var(--color-gray-200, currentcolor);
+    border-color: var(--border-base, currentcolor);
   }
 }
 
+/* Premium Component Utilities */
+
 @utility card-base {
-  /* Cards & Surface Containers */
-  @apply bg-surface border border-border rounded-3xl p-6 shadow-xs transition-colors duration-150;
+  @apply bg-surface/90 backdrop-blur-md border border-border rounded-2xl p-6 shadow-sm transition-all duration-200;
 }
 
 @utility card-interactive {
-  @apply bg-surface hover:bg-surface-elevated border border-border hover:border-accent rounded-3xl p-6 shadow-xs transition-all duration-150;
+  @apply bg-surface/90 hover:bg-surface-elevated/95 backdrop-blur-md border border-border hover:border-accent/60 rounded-2xl p-6 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200;
 }
 
 @utility card-elevated {
-  @apply bg-surface-elevated border border-border rounded-3xl p-6 shadow-md transition-colors duration-150;
+  @apply bg-surface-elevated/95 backdrop-blur-lg border border-border/90 rounded-2xl p-6 shadow-xl transition-all duration-200;
 }
 
 @utility card-subtle {
-  @apply bg-surface-subtle border border-border-subtle rounded-2xl p-4 transition-colors duration-150;
+  @apply bg-surface-subtle/70 border border-border-subtle rounded-xl p-4 transition-all duration-150;
+}
+
+@utility card-glass {
+  @apply bg-surface/75 backdrop-blur-xl border border-border/70 rounded-2xl p-6 shadow-lg;
 }
 
 @utility input-base {
-  /* Form Elements */
-  @apply w-full bg-surface-subtle border border-border rounded-xl px-3.5 py-2.5 text-sm text-foreground placeholder:text-foreground-muted focus:outline-hidden focus:border-accent focus:ring-1 focus:ring-accent transition-colors duration-150;
+  @apply w-full bg-surface-subtle border border-border rounded-xl px-3.5 py-2.5 text-sm text-foreground placeholder:text-foreground-muted focus:outline-hidden focus:border-accent focus:ring-2 focus:ring-accent/25 transition-all duration-150;
 }
 
 @utility badge-base {
-  /* Badges & Status Pills */
   @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono uppercase tracking-wider transition-colors duration-150;
 }
 
 @utility badge-accent {
-  @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono uppercase tracking-wider bg-accent-muted text-accent border border-accent font-medium;
+  @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono uppercase tracking-wider bg-accent-muted text-accent border border-accent/40 font-medium shadow-xs;
 }
 
 @utility badge-neutral {
@@ -110,20 +106,19 @@
 }
 
 @utility btn-base {
-  /* Buttons */
-  @apply inline-flex items-center justify-center font-medium transition-all duration-200 select-none focus:outline-hidden focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98];
+  @apply inline-flex items-center justify-center font-medium transition-all duration-200 select-none focus:outline-hidden focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.97] cursor-pointer;
 }
 
 @utility btn-primary {
-  @apply btn-base bg-accent hover:bg-accent-hover text-white font-semibold shadow-xs;
+  @apply btn-base bg-accent hover:bg-accent-hover text-white font-semibold shadow-md shadow-accent/20 hover:shadow-lg hover:shadow-accent/30;
 }
 
 @utility btn-secondary {
-  @apply btn-base bg-surface-elevated hover:bg-surface-subtle text-foreground border border-border;
+  @apply btn-base bg-surface-elevated hover:bg-surface-subtle text-foreground border border-border shadow-xs hover:border-accent/40;
 }
 
 @utility btn-outline {
-  @apply btn-base border border-border hover:bg-surface-elevated text-foreground;
+  @apply btn-base border border-border hover:border-accent hover:bg-surface-elevated text-foreground;
 }
 
 @utility btn-ghost {
@@ -131,7 +126,6 @@
 }
 
 @utility heading-page {
-  /* Typography & Layout helpers */
   @apply text-2xl sm:text-3xl font-bold tracking-tight text-foreground;
 }
 
@@ -147,17 +141,33 @@
   @apply max-w-6xl mx-auto px-6;
 }
 
+@utility glow-accent {
+  box-shadow: 0 0 35px -5px rgba(63, 114, 175, 0.4);
+}
+
+@utility glow-amber {
+  box-shadow: 0 0 30px -5px rgba(245, 158, 11, 0.35);
+}
+
+@utility glow-emerald {
+  box-shadow: 0 0 30px -5px rgba(16, 185, 129, 0.35);
+}
+
+@utility text-gradient-accent {
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-sky-300 to-indigo-300;
+}
+
 @layer utilities {
   :root,
   .dark,
   [data-theme='dark'] {
     color-scheme: dark;
 
-    /* Primary Palette: #F9F7F7, #DBE2EF, #3F72AF, #112D4E */
-    --bg-canvas: #0e233d;
+    /* Signature Midnight Navy Palette */
+    --bg-canvas: #0b1a2f;
     --bg-surface: #112d4e;
     --bg-elevated: #1b3e69;
-    --bg-subtle: #0a1c32;
+    --bg-subtle: #081526;
 
     --border-base: #1e4575;
     --border-subtle: rgba(219, 226, 239, 0.15);
@@ -171,26 +181,27 @@
     --accent: #3f72af;
     --accent-hover: #5084c3;
     --accent-contrast: #ffffff;
-    --accent-muted: rgba(63, 114, 175, 0.2);
+    --accent-muted: rgba(63, 114, 175, 0.25);
 
     --scrollbar-thumb: #1e4575;
     --scrollbar-thumb-hover: #3f72af;
 
     --calendar-picker-filter: invert(1);
+    --mesh-glow: radial-gradient(circle at 50% 0%, rgba(63, 114, 175, 0.18) 0%, transparent 65%);
   }
 
   .light,
   [data-theme='light'] {
     color-scheme: light;
 
-    /* Inverted light theme using the exact palette */
+    /* Inverted Ice-Blue Porcelain Theme */
     --bg-canvas: #f9f7f7;
     --bg-surface: #ffffff;
     --bg-elevated: #eef3f9;
     --bg-subtle: #e4ecf6;
 
     --border-base: #dbe2ef;
-    --border-subtle: rgba(63, 114, 175, 0.12);
+    --border-subtle: rgba(63, 114, 175, 0.14);
     --border-focus: #3f72af;
 
     --text-primary: #112d4e;
@@ -201,23 +212,27 @@
     --accent: #3f72af;
     --accent-hover: #325e93;
     --accent-contrast: #ffffff;
-    --accent-muted: rgba(63, 114, 175, 0.14);
+    --accent-muted: rgba(63, 114, 175, 0.15);
 
     --scrollbar-thumb: #dbe2ef;
     --scrollbar-thumb-hover: #3f72af;
 
     --calendar-picker-filter: none;
+    --mesh-glow: radial-gradient(circle at 50% 0%, rgba(63, 114, 175, 0.1) 0%, transparent 65%);
   }
 
   body {
     background-color: var(--bg-canvas);
+    background-image: var(--mesh-glow);
+    background-repeat: no-repeat;
+    background-attachment: fixed;
     color: var(--text-primary);
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     transition:
-      background-color 0.2s ease,
-      color 0.2s ease;
+      background-color 0.25s ease,
+      color 0.25s ease;
   }
 
   /* Custom minimal scrollbar */
@@ -239,13 +254,11 @@
     background: var(--scrollbar-thumb-hover);
   }
 
-  /* Restrained selection styling */
   ::selection {
     background: var(--accent);
     color: var(--accent-contrast);
   }
 
-  /* Form controls theme compatibility */
   select option {
     background-color: var(--bg-surface);
     color: var(--text-primary);
@@ -255,6 +268,4 @@
     filter: var(--calendar-picker-filter);
     cursor: pointer;
   }
-
-  /* Memorable, reusable utility and component classes */
 }

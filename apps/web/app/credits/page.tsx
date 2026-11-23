@@ -13,6 +13,8 @@ import {
   ArrowLeft,
   CheckCircle2,
   Sparkles,
+  Headphones,
+  Zap,
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 
@@ -28,7 +30,7 @@ export default function CreditsPage() {
       name: 'Md. Asraful Islam Furdus',
       role: 'Lead Full-Stack Architect',
       details:
-        'Next.js 15 App Router architecture, Express.js REST API, authoritative Socket.IO synchronization engine, Prisma ORM schema design, GSAP animations, and end-to-end deployment setup.',
+        'Next.js 15 App Router architecture, Express.js REST API, authoritative Socket.IO synchronization engine, Prisma ORM schema design, GSAP animations, and deployment pipeline.',
       initials: 'AF',
     },
     {
@@ -75,7 +77,9 @@ export default function CreditsPage() {
     'Authoritative server-side synchronized Pomodoro state (zero clock drift)',
     'Real-time collaborative task board with multi-column status pipelines',
     'Heartbeat-driven user presence tracking and active room member counter',
+    'Web Audio harmonic phase transition completion chime synthesis',
     'Relational productivity analytics, streak calculation, and focus metrics',
+    'Speed-of-thought keyboard Command Palette (⌘K) for power-user navigation',
     'Normalized PostgreSQL database schema managed via Prisma ORM',
     'Comprehensive automated test suite covering auth, concurrency, and timer logic',
   ];
@@ -84,7 +88,7 @@ export default function CreditsPage() {
     <div className="min-h-screen bg-canvas text-foreground flex flex-col selection:bg-accent selection:text-accent-contrast transition-colors duration-200">
       <Navbar />
 
-      <main className="flex-1 max-w-5xl mx-auto px-6 py-12 w-full space-y-12">
+      <main className="flex-1 max-w-5xl mx-auto px-4 sm:px-6 py-12 w-full space-y-12">
         {/* Back Link */}
         <div>
           <Link
@@ -98,7 +102,7 @@ export default function CreditsPage() {
 
         {/* Page Header */}
         <div className="space-y-4">
-          <div className="badge-base bg-surface border border-border px-4 py-1.5 shadow-xs">
+          <div className="badge-base bg-surface-elevated border border-border px-4 py-1.5 shadow-2xs inline-flex items-center gap-2">
             <GraduationCap className="w-4 h-4 text-accent" />
             <span className="text-xs font-mono uppercase tracking-wider text-foreground-secondary">
               Academic Project Attribution
@@ -115,38 +119,38 @@ export default function CreditsPage() {
         </div>
 
         {/* Academic Course Information Card */}
-        <div className="card-base p-6 sm:p-8 space-y-6">
-          <div className="flex items-center gap-2.5 text-xs font-mono uppercase tracking-widest text-accent">
+        <div className="card-glass p-6 sm:p-8 space-y-6 border-accent/25">
+          <div className="flex items-center gap-2.5 text-xs font-mono uppercase tracking-widest text-accent font-semibold">
             <Sparkles className="w-4 h-4" />
             Course &amp; Academic Program Context
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="card-subtle space-y-1 p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="card-subtle space-y-1 p-4 bg-surface-elevated/70">
               <span className="text-[11px] uppercase font-mono text-foreground-muted block">Course</span>
-              <p className="font-semibold text-sm text-foreground">SD3 — Web Development</p>
+              <p className="font-bold text-sm text-foreground">SD3 — Web Development</p>
             </div>
 
-            <div className="card-subtle space-y-1 p-4">
-              <span className="text-[11px] uppercase font-mono text-foreground-muted block">Academic Program</span>
-              <p className="font-semibold text-sm text-foreground">ECSE Department</p>
+            <div className="card-subtle space-y-1 p-4 bg-surface-elevated/70">
+              <span className="text-[11px] uppercase font-mono text-foreground-muted block">Department</span>
+              <p className="font-bold text-sm text-foreground">ECSE Department</p>
             </div>
 
-            <div className="card-subtle space-y-1 p-4">
+            <div className="card-subtle space-y-1 p-4 bg-surface-elevated/70">
               <span className="text-[11px] uppercase font-mono text-foreground-muted block">Section</span>
-              <p className="font-semibold text-sm text-foreground">Section D</p>
+              <p className="font-bold text-sm text-foreground">Section D</p>
             </div>
 
-            <div className="card-subtle space-y-1 p-4">
+            <div className="card-subtle space-y-1 p-4 bg-surface-elevated/70">
               <span className="text-[11px] uppercase font-mono text-foreground-muted block">Team Identity</span>
-              <p className="font-semibold text-sm text-accent">Group Astro</p>
+              <p className="font-bold text-sm text-accent">Group Astro</p>
             </div>
           </div>
         </div>
 
         {/* Team Members Section */}
         <div className="space-y-6">
-          <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-foreground">
+          <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-foreground">
             <Users className="w-4 h-4 text-accent" />
             <h2>Development Team &amp; Engineering Contributors</h2>
           </div>
@@ -155,22 +159,22 @@ export default function CreditsPage() {
             {teamMembers.map((member, idx) => (
               <div
                 key={idx}
-                className="card-base p-6 sm:p-7 space-y-4 flex flex-col justify-between"
+                className="card-base p-6 sm:p-7 space-y-4 flex flex-col justify-between hover:border-accent/50 transition-all shadow-sm"
               >
                 <div>
                   <div className="flex items-center gap-4 mb-4">
-                    <div className="w-12 h-12 rounded-2xl bg-surface-elevated border border-border text-accent font-mono font-bold text-base flex items-center justify-center">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-accent to-sky-400 text-white font-mono font-bold text-base flex items-center justify-center shadow-md">
                       {member.initials}
                     </div>
                     <div>
                       <h3 className="text-base font-bold text-foreground">{member.name}</h3>
-                      <p className="text-xs text-accent font-medium">{member.role}</p>
+                      <p className="text-xs text-accent font-semibold">{member.role}</p>
                     </div>
                   </div>
                   <p className="text-xs text-foreground-secondary leading-relaxed">{member.details}</p>
                 </div>
 
-                <div className="pt-4 divider-subtle text-[11px] text-foreground-muted">
+                <div className="pt-3 text-[11px] text-foreground-muted font-mono">
                   Group Astro • ECSE Section D
                 </div>
               </div>
@@ -180,7 +184,7 @@ export default function CreditsPage() {
 
         {/* Architectural Highlights */}
         <div className="space-y-6">
-          <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-foreground">
+          <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-foreground">
             <Code2 className="w-4 h-4 text-accent" />
             <h2>Technical Architecture Specifications</h2>
           </div>
@@ -191,14 +195,14 @@ export default function CreditsPage() {
               return (
                 <div
                   key={idx}
-                  className="card-subtle p-5 space-y-3"
+                  className="card-subtle p-5 space-y-3 hover:border-accent/40 transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-surface-elevated border border-border flex items-center justify-center text-accent">
-                      <Icon className="w-4 h-4" />
+                    <div className="w-10 h-10 rounded-xl bg-surface-elevated border border-border flex items-center justify-center text-accent">
+                      <Icon className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="text-xs font-semibold text-foreground">{tech.title}</h3>
+                      <h3 className="text-xs font-bold text-foreground">{tech.title}</h3>
                       <p className="text-[11px] text-foreground-muted">{tech.subtitle}</p>
                     </div>
                   </div>
@@ -210,11 +214,14 @@ export default function CreditsPage() {
         </div>
 
         {/* Defense Criteria Met Checklist */}
-        <div className="card-elevated p-6 sm:p-8 space-y-5">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-foreground">
-            Academic Project Defense Deliverables
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="card-elevated p-6 sm:p-8 space-y-5 border-accent/25">
+          <div className="flex items-center gap-2">
+            <Zap className="w-4 h-4 text-accent" />
+            <h2 className="text-sm font-bold uppercase tracking-wider text-foreground">
+              Academic Project Defense Deliverables
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             {defenseCriteria.map((item, idx) => (
               <div key={idx} className="flex items-start gap-2.5 text-xs text-foreground-secondary">
                 <CheckCircle2 className="w-4 h-4 text-accent shrink-0 mt-0.5" />
@@ -225,7 +232,7 @@ export default function CreditsPage() {
         </div>
 
         {/* Actions */}
-        <div className="pt-6 divider-subtle flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <Link href="/">
             <Button variant="secondary" size="md">
               Return to Landing Page
@@ -233,7 +240,7 @@ export default function CreditsPage() {
           </Link>
 
           <Link href="/login">
-            <Button variant="primary" size="md">
+            <Button variant="primary" size="md" className="font-semibold shadow-md shadow-accent/25">
               Launch Application
             </Button>
           </Link>

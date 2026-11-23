@@ -10,6 +10,7 @@ import {
   BarChart3,
   Settings,
   Sparkles,
+  Plus,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -25,48 +26,83 @@ export const Sidebar: React.FC = () => {
   ];
 
   return (
-    <aside className="w-64 border-r border-border bg-surface hidden md:flex flex-col justify-between p-4 min-h-[calc(100vh-64px)] transition-colors duration-200">
-      <div className="space-y-1">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-foreground-muted px-3 mb-2 block">
-          Navigation
-        </span>
+    <aside className="w-64 border-r border-border bg-surface/90 backdrop-blur-md hidden md:flex flex-col justify-between p-4 min-h-[calc(100vh-64px)] transition-colors duration-200">
+      <div className="space-y-4">
+        {/* Navigation Section */}
+        <div>
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-foreground-muted px-3 mb-2 block">
+            Navigation
+          </span>
 
-        {links.map((link) => {
-          const Icon = link.icon;
-          const isActive = pathname === link.href || pathname.startsWith(`${link.href}/`);
+          <div className="space-y-1">
+            {links.map((link) => {
+              const Icon = link.icon;
+              const isActive = pathname === link.href || pathname.startsWith(`${link.href}/`);
 
-          return (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all duration-150',
-                isActive
-                  ? 'bg-surface-elevated text-accent font-semibold border border-border shadow-xs'
-                  : 'text-foreground-secondary hover:text-foreground hover:bg-surface-subtle'
-              )}
-            >
-              <Icon className={cn('w-4 h-4', isActive ? 'text-accent' : 'text-foreground-muted')} />
-              <span>{link.label}</span>
-            </Link>
-          );
-        })}
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={cn(
+                    'flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all duration-150 group relative',
+                    isActive
+                      ? 'bg-accent/15 text-accent font-semibold border border-accent/30 shadow-xs'
+                      : 'text-foreground-secondary hover:text-foreground hover:bg-surface-subtle'
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon
+                      className={cn(
+                        'w-4 h-4 transition-transform group-hover:scale-110',
+                        isActive ? 'text-accent' : 'text-foreground-muted'
+                      )}
+                    />
+                    <span>{link.label}</span>
+                  </div>
+
+                  {isActive && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-accent shadow-xs shadow-accent" />
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Quick Room Action */}
+        <div className="px-2">
+          <Link
+            href="/rooms/create"
+            className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-surface-elevated hover:bg-surface-subtle border border-border hover:border-accent/40 text-xs font-medium text-foreground transition-all shadow-2xs group"
+          >
+            <Plus className="w-3.5 h-3.5 text-accent group-hover:rotate-90 transition-transform duration-200" />
+            <span>Launch New Room</span>
+          </Link>
+        </div>
       </div>
 
-      {/* Workspace Status Card */}
-      <div className="card-subtle space-y-2">
-        <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
-          <Sparkles className="w-4 h-4 text-accent" />
-          <span>StudyFlow Pro</span>
+      {/* Attribution Card */}
+      <div className="card-subtle space-y-2.5 border-accent/20">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
+            <Sparkles className="w-4 h-4 text-accent" />
+            <span>StudyFlow Workspace</span>
+          </div>
+          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-sm bg-accent/15 text-accent border border-accent/30 font-semibold">
+            v1.2
+          </span>
         </div>
         <p className="text-[11px] text-foreground-muted leading-relaxed">
-          Authoritative real-time rooms, shared task boards, and synchronized Pomodoro.
+          Authoritative real-time synchronized Pomodoro with sub-50ms latency.
         </p>
-        <div className="text-[10px] text-foreground-secondary pt-1.5 divider-subtle flex items-center justify-between">
-          <Link href="/credits" className="hover:text-accent transition-colors">
-            Credits &amp; Team
+        <div className="text-[10px] text-foreground-secondary pt-1.5 flex items-center justify-between">
+          <Link href="/credits" className="hover:text-accent font-medium transition-colors">
+            Team &amp; Specifications
           </Link>
-          <span className="text-foreground-muted font-mono">v1.0.0</span>
+          <span className="text-emerald-400 font-mono text-[10px] flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            Active
+          </span>
         </div>
       </div>
     </aside>

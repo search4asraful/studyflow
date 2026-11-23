@@ -149,7 +149,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 pt-3 divider-subtle">
+        <div className="flex items-center justify-end gap-2 pt-2">
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
           </Button>

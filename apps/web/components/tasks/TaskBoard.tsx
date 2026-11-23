@@ -4,7 +4,9 @@ import React, { useState, useMemo } from 'react';
 import { Task, TaskStatus } from '@studyflow/shared';
 import { TaskCard } from './TaskCard';
 import { Button } from '../ui/Button';
-import { Plus, Search, Filter } from 'lucide-react';
+import { Plus, Search, Filter, CheckCircle2 } from 'lucide-react';
+import { triggerConfetti } from '../../lib/confetti';
+import { playTaskCompletionSound } from '../../lib/audio';
 
 interface TaskBoardProps {
   tasks: Task[];
@@ -13,11 +15,11 @@ interface TaskBoardProps {
   onOpenCreateModal: () => void;
 }
 
-const COLUMNS: { id: TaskStatus; title: string; color: string }[] = [
-  { id: 'BACKLOG', title: 'Backlog', color: 'bg-zinc-500' },
-  { id: 'TODO', title: 'To Do', color: 'bg-amber-500 dark:bg-amber-400' },
-  { id: 'IN_PROGRESS', title: 'In Progress', color: 'bg-accent' },
-  { id: 'COMPLETED', title: 'Completed', color: 'bg-emerald-600 dark:bg-emerald-400' },
+const COLUMNS: { id: TaskStatus; title: string; color: string; badgeColor: string }[] = [
+  { id: 'BACKLOG', title: 'Backlog', color: 'bg-zinc-400', badgeColor: 'bg-zinc-500/15 text-zinc-400' },
+  { id: 'TODO', title: 'To Do', color: 'bg-amber-400', badgeColor: 'bg-amber-500/15 text-amber-400' },
+  { id: 'IN_PROGRESS', title: 'In Progress', color: 'bg-accent', badgeColor: 'bg-accent/15 text-accent' },
+  { id: 'COMPLETED', title: 'Completed', color: 'bg-emerald-400', badgeColor: 'bg-emerald-500/15 text-emerald-400' },
 ];
 
 export const TaskBoard: React.FC<TaskBoardProps> = ({
@@ -41,67 +43,100 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
     });
   }, [tasks, searchQuery, priorityFilter]);
 
+  const completedCount = tasks.filter((t) => t.status === 'COMPLETED').length;
+  const progressPercent = tasks.length > 0 ? Math.round((completedCount / tasks.length) * 100) : 0;
+
+  const handleStatusTransition = (taskId: string, newStatus: TaskStatus) => {
+    onUpdateTask(taskId, { status: newStatus });
+    if (newStatus === 'COMPLETED') {
+      triggerConfetti({ particleCount: 60 });
+      playTaskCompletionSound();
+    }
+  };
+
   return (
     <div className="flex flex-col h-full space-y-4">
-      {/* Board Controls */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 card-subtle p-3.5">
-        <div className="flex items-center gap-2 flex-1">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="w-4 h-4 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search room tasks..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="input-base pl-9 py-1.5 text-xs"
-            />
+      {/* Board Controls & Progress Bar */}
+      <div className="card-subtle p-4 space-y-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2 flex-1">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="w-4 h-4 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Filter room tasks..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="input-base pl-9 py-1.5 text-xs"
+              />
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <Filter className="w-3.5 h-3.5 text-foreground-muted" />
+              <select
+                value={priorityFilter}
+                onChange={(e) => setPriorityFilter(e.target.value)}
+                className="input-base w-auto px-2.5 py-1.5 text-xs bg-surface text-foreground"
+              >
+                <option value="ALL">All Priorities</option>
+                <option value="LOW">Low</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="HIGH">High</option>
+                <option value="URGENT">Urgent</option>
+              </select>
+            </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <Filter className="w-3.5 h-3.5 text-foreground-muted" />
-            <select
-              value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value)}
-              className="input-base w-auto px-2.5 py-1.5 text-xs bg-surface text-foreground"
-            >
-              <option value="ALL" className="bg-surface text-foreground">All Priorities</option>
-              <option value="LOW" className="bg-surface text-foreground">Low</option>
-              <option value="MEDIUM" className="bg-surface text-foreground">Medium</option>
-              <option value="HIGH" className="bg-surface text-foreground">High</option>
-              <option value="URGENT" className="bg-surface text-foreground">Urgent</option>
-            </select>
-          </div>
+          <Button
+            onClick={onOpenCreateModal}
+            size="sm"
+            variant="primary"
+            className="whitespace-nowrap gap-1.5 font-semibold"
+          >
+            <Plus className="w-4 h-4" />
+            Add Room Task
+          </Button>
         </div>
 
-        <Button
-          onClick={onOpenCreateModal}
-          size="sm"
-          className="whitespace-nowrap"
-        >
-          <Plus className="w-4 h-4" />
-          Add Task
-        </Button>
+        {/* Task Board Completion Progress Bar */}
+        {tasks.length > 0 && (
+          <div className="space-y-1 pt-1">
+            <div className="flex items-center justify-between text-[11px] font-mono text-foreground-muted">
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                Overall Task Progress
+              </span>
+              <span>{completedCount} of {tasks.length} resolved ({progressPercent}%)</span>
+            </div>
+            <div className="w-full h-1.5 bg-surface-elevated rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-accent to-emerald-400 transition-all duration-500 rounded-full"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 4-Column Board Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 flex-1">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 flex-1">
         {COLUMNS.map((col) => {
           const colTasks = filteredTasks.filter((t) => t.status === col.id);
 
           return (
             <div
               key={col.id}
-              className="flex flex-col bg-surface border border-border rounded-2xl p-3.5 min-h-[400px]"
+              className="flex flex-col bg-surface/90 backdrop-blur-md border border-border rounded-2xl p-3.5 min-h-[420px] shadow-xs"
             >
               {/* Column Header */}
-              <div className="flex items-center justify-between pb-3 mb-3 divider-subtle">
+              <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <span className={`w-2 h-2 rounded-full ${col.color}`} />
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
                     {col.title}
                   </h3>
                 </div>
-                <span className="text-xs text-foreground-muted font-mono bg-surface-elevated px-2 py-0.5 rounded-full border border-border">
+                <span className={`text-[11px] font-mono px-2 py-0.5 rounded-full border border-border font-semibold ${col.badgeColor}`}>
                   {colTasks.length}
                 </span>
               </div>
@@ -117,9 +152,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({
                     <TaskCard
                       key={task.id}
                       task={task}
-                      onUpdateStatus={(taskId, newStatus) =>
-                        onUpdateTask(taskId, { status: newStatus })
-                      }
+                      onUpdateStatus={handleStatusTransition}
                       onDelete={onDeleteTask}
                       canDelete={true}
                     />

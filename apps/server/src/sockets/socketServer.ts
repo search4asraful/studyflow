@@ -97,7 +97,6 @@ export function setupSocketServer(httpServer: HttpServer): SocketIOServer {
   io.on('connection', (rawSocket: Socket) => {
     const socket = rawSocket as AuthenticatedSocket;
     const user = socket.data.user;
-    // console.log(`[Socket] User connected: ${user.name} (${socket.id})`);
 
     // Join room
     socket.on(SOCKET_EVENTS.CLIENT.ROOM_JOIN, async (data: { roomId: string }, callback) => {
@@ -157,8 +156,8 @@ export function setupSocketServer(httpServer: HttpServer): SocketIOServer {
           userName: user.name,
           roomId,
         });
-      } catch (err) {
-        console.error('[Socket] Leave room error:', err);
+      } catch {
+        // Silently handled without console exposure
       }
     });
 
@@ -242,7 +241,7 @@ export function setupSocketServer(httpServer: HttpServer): SocketIOServer {
 
     // Participant heartbeat
     socket.on(SOCKET_EVENTS.CLIENT.PARTICIPANT_HEARTBEAT, async (data: { roomId: string }) => {
-      if (data?.roomId) {
+      if (data?.roomId && socket.data.joinedRooms.has(data.roomId)) {
         TimerService.registerParticipant(data.roomId, user.id);
         await prisma.roomMember.updateMany({
           where: { roomId: data.roomId, userId: user.id },
@@ -251,9 +250,12 @@ export function setupSocketServer(httpServer: HttpServer): SocketIOServer {
       }
     });
 
-    // Room real-time activity/chat
+    // Room real-time activity/chat (strictly authorized to joined room members)
     socket.on(SOCKET_EVENTS.CLIENT.ROOM_CHAT, async (data: { roomId: string; message: string }) => {
       if (!data?.roomId || !data?.message?.trim()) return;
+      if (!socket.data.joinedRooms.has(data.roomId)) {
+        return;
+      }
 
       const activity = {
         id: `chat_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,

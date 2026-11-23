@@ -15,13 +15,9 @@ export const errorHandler = (
     });
   }
 
-  console.error('Unhandled Server Error:', err);
-
-  const message =
-    env.NODE_ENV === 'production' ? 'Internal server error' : err.message || 'Internal server error';
-
+  // Do not expose unhandled database errors or stacks to clients
   return res.status(500).json({
     success: false,
-    error: message,
+    error: 'Internal server error',
   });
 };

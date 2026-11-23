@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -22,58 +22,100 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   className,
 }) => {
+  const [mounted, setMounted] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+  const [shouldRender, setShouldRender] = useState(isOpen);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Sync open/close states and lock body scroll smoothly
+  useEffect(() => {
+    if (isOpen) {
+      setShouldRender(true);
+      setIsClosing(false);
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    } else if (shouldRender) {
+      setIsClosing(true);
+      const timer = setTimeout(() => {
+        setShouldRender(false);
+        setIsClosing(false);
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, shouldRender]);
+
+  // Handle Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) onClose();
+      if (e.key === 'Escape' && isOpen && !isClosing) {
+        onClose();
+      }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isOpen, isClosing, onClose]);
 
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-black/60 backdrop-blur-xs"
-          />
+  if (!mounted || !shouldRender) return null;
 
-          {/* Dialog Container */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: 8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 8 }}
-            transition={{ duration: 0.15, ease: 'easeOut' }}
-            className={cn(
-              'relative w-full max-w-lg card-elevated p-6 shadow-2xl z-10',
-              className
-            )}
-          >
-            <div className="flex items-start justify-between mb-5">
-              <div>
-                {title && (
-                  <h3 className="text-lg font-semibold text-foreground tracking-tight">{title}</h3>
-                )}
-                {description && <p className="text-xs text-foreground-secondary mt-1">{description}</p>}
-              </div>
-              <button
-                onClick={onClose}
-                className="text-foreground-muted hover:text-foreground p-1 rounded-lg transition-colors"
-                aria-label="Close dialog"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div>{children}</div>
-          </motion.div>
-        </div>
+  const modalContent = (
+    <div
+      className={cn(
+        'fixed inset-0 z-50 flex items-center justify-center p-4 transition-all',
+        isClosing ? 'pointer-events-none' : 'pointer-events-auto'
       )}
-    </AnimatePresence>
+      role="dialog"
+      aria-modal="true"
+    >
+      {/* Backdrop with pure GPU-accelerated opacity (Zero flicker) */}
+      <div
+        onClick={onClose}
+        className={cn(
+          'fixed inset-0 bg-black/60 backdrop-blur-xs transform-gpu transition-opacity duration-150 ease-out',
+          isClosing ? 'opacity-0' : 'opacity-100 animate-in fade-in'
+        )}
+      />
+
+      {/* Dialog Container with pure GPU hardware acceleration */}
+      <div
+        className={cn(
+          'relative w-full max-w-lg card-elevated p-6 shadow-2xl z-10 transform-gpu transition-all duration-150 ease-out bg-surface-elevated/95',
+          isClosing
+            ? 'opacity-0 scale-95 translate-y-2'
+            : 'opacity-100 scale-100 translate-y-0 animate-in fade-in zoom-in-95 duration-150',
+          className
+        )}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between mb-5">
+          <div>
+            {title && (
+              <h3 className="text-lg font-semibold text-foreground tracking-tight">{title}</h3>
+            )}
+            {description && (
+              <p className="text-xs text-foreground-secondary mt-1">{description}</p>
+            )}
+          </div>
+          <button
+            onClick={onClose}
+            className="text-foreground-muted hover:text-foreground hover:bg-surface-subtle p-1.5 rounded-lg transition-colors cursor-pointer"
+            aria-label="Close dialog"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div>{children}</div>
+      </div>
+    </div>
   );
+
+  return createPortal(modalContent, document.body);
 };
