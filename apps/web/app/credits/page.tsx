@@ -1,22 +1,19 @@
-import React from 'react';
-import Link from 'next/link';
-import { Navbar } from '../../components/layout/Navbar';
-import { LandingFooter } from '../../components/landing/LandingFooter';
 import {
-  GraduationCap,
-  Users,
-  Code2,
-  Cpu,
-  Globe,
-  Database,
-  Lock,
   ArrowLeft,
   CheckCircle2,
+  Code2,
+  Cpu,
+  Database,
+  Globe,
+  GraduationCap,
+  Lock,
   Sparkles,
-  Headphones,
-  Zap,
+  Users,
+  Zap
 } from 'lucide-react';
-import { Button } from '../../components/ui/Button';
+import Link from 'next/link';
+import { LandingFooter } from '../../components/landing/LandingFooter';
+import { Navbar } from '../../components/layout/Navbar';
 
 export const metadata = {
   title: 'Credits & Academic Attribution — StudyFlow',
@@ -30,7 +27,7 @@ export default function CreditsPage() {
       name: 'Md. Asraful Islam Furdus',
       role: 'Lead Full-Stack Architect',
       details:
-        'Next.js 15 App Router architecture, Express.js REST API, authoritative Socket.IO synchronization engine, Prisma ORM schema design, GSAP animations, and deployment pipeline.',
+        'next.js 16 App Router architecture, Express.js REST API, authoritative Socket.IO synchronization engine, Prisma ORM schema design, GSAP animations, and deployment pipeline.',
       initials: 'AF',
     },
     {
@@ -46,7 +43,7 @@ export default function CreditsPage() {
     {
       icon: Cpu,
       title: 'Full-Stack Architecture',
-      subtitle: 'Next.js 15 & Express.js',
+      subtitle: 'next.js 16 & Express.js',
       description:
         'Turborepo monorepo with React 19, TypeScript strict mode, server-side data fetching, and dedicated Express API server.',
     },
@@ -88,7 +85,7 @@ export default function CreditsPage() {
     <div className="min-h-screen bg-canvas text-foreground flex flex-col selection:bg-accent selection:text-accent-contrast transition-colors duration-200">
       <Navbar />
 
-      <main className="flex-1 max-w-5xl mx-auto px-4 sm:px-6 py-12 w-full space-y-12">
+      <main className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 py-12 w-full space-y-12">
         {/* Back Link */}
         <div>
           <Link
@@ -229,21 +226,6 @@ export default function CreditsPage() {
               </div>
             ))}
           </div>
-        </div>
-
-        {/* Actions */}
-        <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <Link href="/">
-            <Button variant="secondary" size="md">
-              Return to Landing Page
-            </Button>
-          </Link>
-
-          <Link href="/login">
-            <Button variant="primary" size="md" className="font-semibold shadow-md shadow-accent/25">
-              Launch Application
-            </Button>
-          </Link>
         </div>
       </main>
 

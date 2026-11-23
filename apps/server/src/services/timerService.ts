@@ -2,6 +2,7 @@ import { TimerPhase, TimerStatus, RoomRole } from '@prisma/client';
 import { prisma } from '../config/prisma';
 import { AuthoritativeTimerState, SOCKET_EVENTS } from '../shared';
 import { ForbiddenError, NotFoundError } from '../utils/errors';
+import { RoomActivityService } from './activityMemory';
 import type { Server as SocketIOServer } from 'socket.io';
 
 export class TimerService {
@@ -174,14 +175,13 @@ export class TimerService {
     const authoritative = await this.getAuthoritativeState(roomId);
     this.broadcastTimerState(roomId, authoritative);
 
-    // Log room activity
-    await prisma.roomActivity.create({
-      data: {
-        roomId,
-        userId,
-        action: 'TIMER_STARTED',
-        details: `Started ${updated.phase} session`,
-      },
+    // Broadcast ephemeral room activity via socket (zero database writes)
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+    RoomActivityService.broadcastActivity(roomId, {
+      userId,
+      userName: user?.name || 'Member',
+      action: 'TIMER_STARTED',
+      details: `Started ${updated.phase.replace('_', ' ')} session`,
     });
 
     return authoritative;
@@ -215,13 +215,13 @@ export class TimerService {
     const updated = await this.getAuthoritativeState(roomId);
     this.broadcastTimerState(roomId, updated);
 
-    await prisma.roomActivity.create({
-      data: {
-        roomId,
-        userId,
-        action: 'TIMER_PAUSED',
-        details: `Paused timer at ${Math.floor(current.remainingSeconds / 60)}m ${current.remainingSeconds % 60}s`,
-      },
+    // Broadcast ephemeral room activity via socket (zero database writes)
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+    RoomActivityService.broadcastActivity(roomId, {
+      userId,
+      userName: user?.name || 'Member',
+      action: 'TIMER_PAUSED',
+      details: `Paused timer at ${Math.floor(current.remainingSeconds / 60)}m ${current.remainingSeconds % 60}s`,
     });
 
     return updated;
@@ -254,13 +254,13 @@ export class TimerService {
     const updated = await this.getAuthoritativeState(roomId);
     this.broadcastTimerState(roomId, updated);
 
-    await prisma.roomActivity.create({
-      data: {
-        roomId,
-        userId,
-        action: 'TIMER_RESUMED',
-        details: `Resumed timer`,
-      },
+    // Broadcast ephemeral room activity via socket (zero database writes)
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+    RoomActivityService.broadcastActivity(roomId, {
+      userId,
+      userName: user?.name || 'Member',
+      action: 'TIMER_RESUMED',
+      details: 'Resumed timer',
     });
 
     return updated;
@@ -278,13 +278,13 @@ export class TimerService {
 
     const updated = await this.transitionToNextPhase(roomId, targetPhase);
 
-    await prisma.roomActivity.create({
-      data: {
-        roomId,
-        userId,
-        action: 'TIMER_SKIPPED',
-        details: `Skipped to ${updated.phase}`,
-      },
+    // Broadcast ephemeral room activity via socket (zero database writes)
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+    RoomActivityService.broadcastActivity(roomId, {
+      userId,
+      userName: user?.name || 'Member',
+      action: 'TIMER_SKIPPED',
+      details: `Skipped to ${updated.phase.replace('_', ' ')}`,
     });
 
     return updated;
@@ -422,6 +422,13 @@ export class TimerService {
       });
       this.broadcastTimerState(roomId, authoritative);
     }
+
+    RoomActivityService.broadcastActivity(roomId, {
+      userId: 'system',
+      userName: 'Timer System',
+      action: 'TIMER_PHASE_CHANGED',
+      details: `${current.phase.replace('_', ' ')} finished! Starting ${nextPhase.replace('_', ' ')}.`,
+    });
 
     return authoritative;
   }

@@ -292,7 +292,7 @@ function RoomWorkspaceView({ roomId }: { roomId: string }) {
             )}
           >
             <AstroRoomChatPanel
-              onSendMessage={(msg) => sendChatMessage(msg)}
+              onSendMessage={(msg, recipientId) => sendChatMessage(msg, recipientId)}
               incomingActivities={storeActivities}
               members={storeMembers}
               className="h-full"

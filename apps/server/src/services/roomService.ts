@@ -9,6 +9,7 @@ import {
 } from '../shared';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../utils/errors';
 import { TimerService } from './timerService';
+import { RoomActivityService } from './activityMemory';
 
 export class RoomService {
   private static generateInviteCode(): string {
@@ -64,16 +65,6 @@ export class RoomService {
         _count: {
           select: { members: true },
         },
-      },
-    });
-
-    // Log activity
-    await prisma.roomActivity.create({
-      data: {
-        roomId: room.id,
-        userId,
-        action: 'ROOM_CREATED',
-        details: `Created room "${room.name}"`,
       },
     });
 
@@ -199,15 +190,6 @@ export class RoomService {
           },
           orderBy: [{ status: 'asc' }, { position: 'asc' }, { createdAt: 'desc' }],
         },
-        activities: {
-          take: 20,
-          orderBy: { createdAt: 'desc' },
-          include: {
-            user: {
-              select: { name: true },
-            },
-          },
-        },
       },
     });
 
@@ -306,15 +288,7 @@ export class RoomService {
         createdAt: t.createdAt.toISOString(),
         updatedAt: t.updatedAt.toISOString(),
       })),
-      recentActivities: room.activities.map((a) => ({
-        id: a.id,
-        roomId: a.roomId,
-        userId: a.userId,
-        userName: a.user?.name || 'User',
-        action: a.action,
-        details: a.details || undefined,
-        createdAt: a.createdAt.toISOString(),
-      })),
+      recentActivities: RoomActivityService.getRecentActivities(roomId),
     };
   }
 
@@ -352,17 +326,6 @@ export class RoomService {
           roomId: room.id,
           userId,
           role: RoomRole.MEMBER,
-        },
-      });
-
-      const user = await prisma.user.findUnique({ where: { id: userId } });
-
-      await prisma.roomActivity.create({
-        data: {
-          roomId: room.id,
-          userId,
-          action: 'MEMBER_JOINED',
-          details: `${user?.name || 'User'} joined via invite code`,
         },
       });
     }
@@ -404,17 +367,6 @@ export class RoomService {
     await prisma.roomMember.delete({
       where: {
         roomId_userId: { roomId, userId },
-      },
-    });
-
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-
-    await prisma.roomActivity.create({
-      data: {
-        roomId,
-        userId,
-        action: 'MEMBER_LEFT',
-        details: `${user?.name || 'User'} left the room`,
       },
     });
   }
@@ -495,6 +447,7 @@ export class RoomService {
     await prisma.studyRoom.delete({
       where: { id: roomId },
     });
+    RoomActivityService.clearRoom(roomId);
   }
 
   static async updateMemberRole(

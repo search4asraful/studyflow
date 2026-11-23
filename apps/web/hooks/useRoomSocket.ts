@@ -195,9 +195,9 @@ export function useRoomSocket(roomId: string | undefined) {
     socket.emit(SOCKET_EVENTS.CLIENT.TASK_DELETE, { taskId });
   };
 
-  const emitChatMessage = (message: string) => {
+  const emitChatMessage = (message: string, recipientId?: string) => {
     const socket = getSocket();
-    socket.emit(SOCKET_EVENTS.CLIENT.ROOM_CHAT, { roomId, message });
+    socket.emit(SOCKET_EVENTS.CLIENT.ROOM_CHAT, { roomId, message, recipientId });
   };
 
   return {

@@ -17,8 +17,6 @@ async function main() {
 
   // Clean existing records to avoid conflicts on re-seed
   await prisma.notification.deleteMany();
-  await prisma.taskActivity.deleteMany();
-  await prisma.roomActivity.deleteMany();
   await prisma.task.deleteMany();
   await prisma.timerState.deleteMany();
   await prisma.pomodoroRecord.deleteMany();
@@ -287,61 +285,7 @@ async function main() {
 
   console.log('✅ Created 8 realistic collaborative tasks');
 
-  // 4. Create Task Activities
-  await prisma.taskActivity.createMany({
-    data: [
-      {
-        taskId: task1.id,
-        userId: asraful.id,
-        action: 'STATUS_CHANGED',
-        details: { from: 'IN_PROGRESS', to: 'COMPLETED' },
-      },
-      {
-        taskId: task2.id,
-        userId: shakil.id,
-        action: 'STATUS_CHANGED',
-        details: { from: 'IN_PROGRESS', to: 'COMPLETED' },
-      },
-      {
-        taskId: task3.id,
-        userId: asraful.id,
-        action: 'ASSIGNED',
-        details: { assignee: asraful.name },
-      },
-    ],
-  });
-
-  // 5. Create Room Activities
-  await prisma.roomActivity.createMany({
-    data: [
-      {
-        roomId: roomAstro.id,
-        userId: asraful.id,
-        action: 'ROOM_CREATED',
-        details: 'Created room "Group Astro — Engineering Workspace"',
-      },
-      {
-        roomId: roomAstro.id,
-        userId: shakil.id,
-        action: 'MEMBER_JOINED',
-        details: 'Joined as Moderator',
-      },
-      {
-        roomId: roomAstro.id,
-        userId: demoUser.id,
-        action: 'MEMBER_JOINED',
-        details: 'Joined via invite code SD3ASTRO',
-      },
-      {
-        roomId: roomAstro.id,
-        userId: asraful.id,
-        action: 'TASK_COMPLETED',
-        details: 'Completed task: Configure PostgreSQL schema & relations with Prisma',
-      },
-    ],
-  });
-
-  // 6. Seed Past Pomodoro Records (14-day history for realistic streak and analytics)
+  // 4. Seed Past Pomodoro Records (14-day history for realistic streak and analytics)
   const now = new Date();
   const pomodoroRecordsData: {
     userId: string;

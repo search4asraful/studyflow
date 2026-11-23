@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { SafeUser, UserProfile } from '@studyflow/shared';
 import { apiRequest } from '../lib/api';
 
@@ -12,53 +13,94 @@ interface AuthState {
   logout: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  profile: null,
-  isLoading: true,
-  isAuthenticated: false,
+// SSR-Safe storage wrapper for Next.js
+const safeLocalStorage = {
+  getItem: (key: string): string | null => {
+    if (typeof window === 'undefined') return null;
+    try {
+      return window.localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  },
+  setItem: (key: string, value: string): void => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(key, value);
+    } catch {
+      // Ignore quota or private browsing errors
+    }
+  },
+  removeItem: (key: string): void => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.removeItem(key);
+    } catch {
+      // Ignore
+    }
+  },
+};
 
-  setUser: (user, profile = null) =>
-    set({
-      user,
-      profile,
-      isAuthenticated: !!user,
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set) => ({
+      user: null,
+      profile: null,
       isLoading: false,
+      isAuthenticated: false,
+
+      setUser: (user, profile = null) =>
+        set({
+          user,
+          profile,
+          isAuthenticated: !!user,
+          isLoading: false,
+        }),
+
+      checkAuth: async () => {
+        try {
+          const data = await apiRequest<{ user: SafeUser; profile: UserProfile | null }>('/auth/me');
+          set({
+            user: data.user,
+            profile: data.profile,
+            isAuthenticated: true,
+            isLoading: false,
+          });
+        } catch {
+          // If server rejects cookie session, clear client state
+          set({
+            user: null,
+            profile: null,
+            isAuthenticated: false,
+            isLoading: false,
+          });
+        }
+      },
+
+      logout: async () => {
+        try {
+          await apiRequest('/auth/logout', { method: 'POST' });
+        } catch {
+          // Handled silently
+        } finally {
+          set({
+            user: null,
+            profile: null,
+            isAuthenticated: false,
+            isLoading: false,
+          });
+          window.location.href = '/login';
+        }
+      },
     }),
-
-  checkAuth: async () => {
-    set({ isLoading: true });
-    try {
-      const data = await apiRequest<{ user: SafeUser; profile: UserProfile | null }>('/auth/me');
-      set({
-        user: data.user,
-        profile: data.profile,
-        isAuthenticated: true,
-        isLoading: false,
-      });
-    } catch {
-      set({
-        user: null,
-        profile: null,
-        isAuthenticated: false,
-        isLoading: false,
-      });
+    {
+      name: 'studyflow-auth-storage',
+      storage: createJSONStorage(() => safeLocalStorage),
+      partialize: (state) => ({
+        user: state.user,
+        profile: state.profile,
+        isAuthenticated: state.isAuthenticated,
+      }),
     }
-  },
-
-  logout: async () => {
-    try {
-      await apiRequest('/auth/logout', { method: 'POST' });
-    } catch {
-      // Handled silently
-    } finally {
-      set({
-        user: null,
-        profile: null,
-        isAuthenticated: false,
-        isLoading: false,
-      });
-      window.location.href = '/login';
-    }
-  },
-}));
+  )
+);
