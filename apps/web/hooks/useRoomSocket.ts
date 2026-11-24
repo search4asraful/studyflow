@@ -4,13 +4,17 @@ import { useEffect, useRef } from 'react';
 import { getSocket } from '../lib/socket';
 import { useRoomStore } from '../stores/roomStore';
 import { useTimerStore } from '../stores/timerStore';
-import { SOCKET_EVENTS, AuthoritativeTimerState, Task, RoomActivity } from '@studyflow/shared';
+import { useAuthStore } from '../stores/authStore';
+import { SOCKET_EVENTS, AuthoritativeTimerState, Task, RoomActivity, RoomRole } from '@studyflow/shared';
 import { toast } from 'sonner';
+
+import { apiRequest } from '../lib/api';
 
 export function useRoomSocket(roomId: string | undefined) {
   const setRoomState = useRoomStore((s) => s.setRoomState);
   const addMember = useRoomStore((s) => s.addMember);
   const updateMemberOnlineStatus = useRoomStore((s) => s.updateMemberOnlineStatus);
+  const updateMemberRole = useRoomStore((s) => s.updateMemberRole);
   const addTask = useRoomStore((s) => s.addTask);
   const updateTask = useRoomStore((s) => s.updateTask);
   const deleteTask = useRoomStore((s) => s.deleteTask);
@@ -99,6 +103,18 @@ export function useRoomSocket(roomId: string | undefined) {
       addActivity(activity);
     };
 
+    const onMemberRoleUpdated = (data: {
+      roomId: string;
+      targetUserId: string;
+      newRole: RoomRole;
+      previousRole: RoomRole;
+      newOwnerId?: string;
+      updatedByUserId: string;
+    }) => {
+      const currentAuthUser = useAuthStore.getState().user;
+      updateMemberRole(data.targetUserId, data.newRole, data.newOwnerId, currentAuthUser?.id);
+    };
+
     const onRoomError = (data: { message: string }) => {
       toast.error(data.message);
     };
@@ -113,6 +129,7 @@ export function useRoomSocket(roomId: string | undefined) {
     socket.on(SOCKET_EVENTS.SERVER.TASK_UPDATED, onTaskUpdated);
     socket.on(SOCKET_EVENTS.SERVER.TASK_DELETED, onTaskDeleted);
     socket.on(SOCKET_EVENTS.SERVER.ROOM_ACTIVITY, onRoomActivity);
+    socket.on(SOCKET_EVENTS.SERVER.MEMBER_ROLE_UPDATED, onMemberRoleUpdated);
     socket.on(SOCKET_EVENTS.SERVER.ROOM_ERROR, onRoomError);
 
     // Local 1s countdown ticker for buttery-smooth client experience
@@ -143,6 +160,7 @@ export function useRoomSocket(roomId: string | undefined) {
       socket.off(SOCKET_EVENTS.SERVER.TASK_UPDATED, onTaskUpdated);
       socket.off(SOCKET_EVENTS.SERVER.TASK_DELETED, onTaskDeleted);
       socket.off(SOCKET_EVENTS.SERVER.ROOM_ACTIVITY, onRoomActivity);
+      socket.off(SOCKET_EVENTS.SERVER.MEMBER_ROLE_UPDATED, onMemberRoleUpdated);
       socket.off(SOCKET_EVENTS.SERVER.ROOM_ERROR, onRoomError);
     };
   }, [
@@ -150,6 +168,7 @@ export function useRoomSocket(roomId: string | undefined) {
     setRoomState,
     addMember,
     updateMemberOnlineStatus,
+    updateMemberRole,
     addTask,
     updateTask,
     deleteTask,
@@ -195,9 +214,86 @@ export function useRoomSocket(roomId: string | undefined) {
     socket.emit(SOCKET_EVENTS.CLIENT.TASK_DELETE, { taskId });
   };
 
+  const emitClaimTask = (taskId: string): Promise<boolean> => {
+    return new Promise((resolve) => {
+      const socket = getSocket();
+      if (!socket.connected) {
+        apiRequest<Task>(`/tasks/${taskId}/claim`, { method: 'POST' })
+          .then((task) => {
+            updateTask(task);
+            toast.success('Task claimed!');
+            resolve(true);
+          })
+          .catch((err) => {
+            toast.error(err.message || 'Failed to claim task');
+            resolve(false);
+          });
+        return;
+      }
+
+      socket.emit(
+        SOCKET_EVENTS.CLIENT.TASK_CLAIM,
+        { taskId },
+        (response: { success: boolean; data?: Task; error?: string }) => {
+          if (response?.success && response.data) {
+            updateTask(response.data);
+            toast.success('Task claimed!');
+            resolve(true);
+          } else {
+            if (response?.error) {
+              toast.error(response.error);
+            }
+            resolve(false);
+          }
+        }
+      );
+    });
+  };
+
+  const emitUnassignTask = (taskId: string): Promise<boolean> => {
+    return new Promise((resolve) => {
+      const socket = getSocket();
+      if (!socket.connected) {
+        apiRequest<Task>(`/tasks/${taskId}/unassign`, { method: 'POST' })
+          .then((task) => {
+            updateTask(task);
+            toast.success('Task unassigned');
+            resolve(true);
+          })
+          .catch((err) => {
+            toast.error(err.message || 'Failed to unassign task');
+            resolve(false);
+          });
+        return;
+      }
+
+      socket.emit(
+        SOCKET_EVENTS.CLIENT.TASK_UNASSIGN,
+        { taskId },
+        (response: { success: boolean; data?: Task; error?: string }) => {
+          if (response?.success && response.data) {
+            updateTask(response.data);
+            toast.success('Task unassigned');
+            resolve(true);
+          } else {
+            if (response?.error) {
+              toast.error(response.error);
+            }
+            resolve(false);
+          }
+        }
+      );
+    });
+  };
+
   const emitChatMessage = (message: string, recipientId?: string) => {
     const socket = getSocket();
     socket.emit(SOCKET_EVENTS.CLIENT.ROOM_CHAT, { roomId, message, recipientId });
+  };
+
+  const emitUpdateMemberRole = (targetUserId: string, newRole: RoomRole) => {
+    const socket = getSocket();
+    socket.emit(SOCKET_EVENTS.CLIENT.MEMBER_ROLE_UPDATE, { roomId, targetUserId, newRole });
   };
 
   return {
@@ -208,6 +304,9 @@ export function useRoomSocket(roomId: string | undefined) {
     createTask: emitCreateTask,
     updateTask: emitUpdateTask,
     deleteTask: emitDeleteTask,
+    claimTask: emitClaimTask,
+    unassignTask: emitUnassignTask,
     sendChatMessage: emitChatMessage,
+    updateMemberRole: emitUpdateMemberRole,
   };
 }

@@ -91,6 +91,10 @@ export default function MyTasksPage() {
   };
 
   const handleDeleteTask = async (taskId: string) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!window.confirm(`Are you sure you want to delete "${task?.title || 'this task'}"?`)) {
+      return;
+    }
     try {
       await apiRequest(`/tasks/${taskId}`, { method: 'DELETE' });
       setTasks((prev) => prev.filter((t) => t.id !== taskId));

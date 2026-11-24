@@ -111,4 +111,16 @@ export class RoomController {
       next(error);
     }
   }
+
+  static async updateMemberRole(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = req.params.id as string;
+      const userId = req.params.userId as string;
+      const { role } = req.body;
+      const result = await RoomService.updateMemberRole(id, userId, role, req.user!.id);
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

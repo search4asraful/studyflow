@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { AppShell } from '../../../components/layout/AppShell';
 import { useRoomStore } from '../../../stores/roomStore';
 import { useAuthStore } from '../../../stores/authStore';
@@ -19,15 +19,20 @@ import {
   Check,
   MessageSquare,
   LayoutGrid,
+  LogOut,
+  Trash2,
+  Loader2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { cn } from '../../../lib/utils';
+import { apiRequest } from '../../../lib/api';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 
 function RoomWorkspaceView({ roomId }: { roomId: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   // Zustand Stores
   const user = useAuthStore((s) => s.user);
@@ -55,6 +60,11 @@ function RoomWorkspaceView({ roomId }: { roomId: string }) {
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
+
+  const isOwner = Boolean(
+    (room.ownerId && user?.id && room.ownerId === user.id) || role === 'OWNER'
+  );
 
   // Mobile view toggle: 'workspace' or 'sidebar'
   const [mobileView, setMobileView] = useState<'workspace' | 'sidebar'>('workspace');
@@ -112,7 +122,10 @@ function RoomWorkspaceView({ roomId }: { roomId: string }) {
     createTask,
     updateTask,
     deleteTask,
+    claimTask,
+    unassignTask,
     sendChatMessage,
+    updateMemberRole,
   } = useRoomSocket(roomId);
 
   const handleCopyInviteCode = () => {
@@ -121,6 +134,42 @@ function RoomWorkspaceView({ roomId }: { roomId: string }) {
     setCopiedCode(true);
     toast.success(`Invite code #${code} copied to clipboard!`);
     setTimeout(() => setCopiedCode(false), 2000);
+  };
+
+  const handleLeaveOrDeleteRoom = async () => {
+    if (isOwner) {
+      const confirmDelete = window.confirm(
+        'Are you sure you want to delete this study room? This will permanently end the session and remove all tasks for all participants.'
+      );
+      if (!confirmDelete) return;
+
+      try {
+        setIsLeaving(true);
+        await apiRequest(`/rooms/${roomId}`, { method: 'DELETE' });
+        toast.success('Study room deleted successfully');
+        useRoomStore.getState().clearRoom();
+        router.push('/rooms');
+      } catch (err: any) {
+        toast.error(err.message || 'Failed to delete room');
+        setIsLeaving(false);
+      }
+    } else {
+      const confirmLeave = window.confirm(
+        'Are you sure you want to leave this study room?'
+      );
+      if (!confirmLeave) return;
+
+      try {
+        setIsLeaving(true);
+        await apiRequest(`/rooms/${roomId}/leave`, { method: 'POST' });
+        toast.success('You have left the study room');
+        useRoomStore.getState().clearRoom();
+        router.push('/rooms');
+      } catch (err: any) {
+        toast.error(err.message || 'Failed to leave room');
+        setIsLeaving(false);
+      }
+    }
   };
 
   // Activity logger callback
@@ -255,6 +304,24 @@ function RoomWorkspaceView({ roomId }: { roomId: string }) {
               <Share2 className="w-3.5 h-3.5 text-accent" />
               <span className="hidden xs:inline">Invite</span>
             </button>
+
+            {/* Leave / Delete Room Button */}
+            <button
+              onClick={handleLeaveOrDeleteRoom}
+              disabled={isLeaving}
+              className="h-8 px-2.5 sm:px-3 inline-flex items-center gap-1.5 text-xs text-rose-400 border border-rose-500/30 hover:bg-rose-500/15 hover:border-rose-500/50 rounded-xl cursor-pointer transition-all font-semibold shadow-2xs shrink-0 disabled:opacity-50"
+              type="button"
+              title={isOwner ? 'Delete Study Room' : 'Leave Study Room'}
+            >
+              {isLeaving ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : isOwner ? (
+                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+              ) : (
+                <LogOut className="w-3.5 h-3.5 text-rose-400" />
+              )}
+              <span className="hidden xs:inline">{isOwner ? 'Delete' : 'Leave'}</span>
+            </button>
           </div>
         </div>
 
@@ -326,6 +393,10 @@ function RoomWorkspaceView({ roomId }: { roomId: string }) {
                 tasks={storeTasks}
                 onUpdateTask={(taskId, updates) => updateTask(taskId, updates)}
                 onDeleteTask={(taskId) => deleteTask(taskId)}
+                onClaimTask={(taskId) => claimTask(taskId)}
+                currentUserId={user?.id}
+                currentUserRole={role}
+                roomOwnerId={room.ownerId}
                 onOpenCreateModal={() => setIsCreateTaskModalOpen(true)}
                 members={storeMembers}
               />
@@ -341,8 +412,11 @@ function RoomWorkspaceView({ roomId }: { roomId: string }) {
           >
             <AstroRoomChatPanel
               onSendMessage={(msg, recipientId) => sendChatMessage(msg, recipientId)}
+              onUpdateMemberRole={(targetUserId, newRole) => updateMemberRole(targetUserId, newRole)}
               incomingActivities={storeActivities}
               members={storeMembers}
+              currentUserRole={role}
+              roomOwnerId={room.ownerId}
               className="h-full min-h-0"
             />
           </div>

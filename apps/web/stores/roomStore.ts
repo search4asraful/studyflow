@@ -22,6 +22,12 @@ interface RoomState {
   updateMemberOnlineStatus: (userId: string, isOnline: boolean) => void;
   addMember: (user: SafeUser) => void;
   removeMember: (userId: string) => void;
+  updateMemberRole: (
+    targetUserId: string,
+    newRole: RoomRole,
+    newOwnerId?: string,
+    currentUserId?: string
+  ) => void;
   
   addTask: (task: Task) => void;
   updateTask: (task: Task) => void;
@@ -84,6 +90,39 @@ export const useRoomStore = create<RoomState>((set) => ({
     set((state) => ({
       members: state.members.filter((m) => m.userId !== userId),
     })),
+
+  updateMemberRole: (targetUserId, newRole, newOwnerId, currentUserId) =>
+    set((state) => {
+      const updatedMembers = state.members.map((m) => {
+        if (m.userId === targetUserId) {
+          return { ...m, role: newRole };
+        }
+        if (newRole === 'OWNER' && m.role === 'OWNER' && m.userId !== targetUserId) {
+          return { ...m, role: 'MODERATOR' as RoomRole };
+        }
+        return m;
+      });
+
+      let updatedRole = state.role;
+      if (currentUserId) {
+        if (targetUserId === currentUserId) {
+          updatedRole = newRole;
+        } else if (newRole === 'OWNER' && state.role === 'OWNER') {
+          updatedRole = 'MODERATOR';
+        }
+      }
+
+      let updatedRoom = state.room;
+      if (newOwnerId && state.room) {
+        updatedRoom = { ...state.room, ownerId: newOwnerId };
+      }
+
+      return {
+        members: updatedMembers,
+        role: updatedRole,
+        room: updatedRoom,
+      };
+    }),
 
   addTask: (task) =>
     set((state) => {

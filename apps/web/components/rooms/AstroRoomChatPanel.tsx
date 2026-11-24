@@ -10,10 +10,14 @@ import {
   Sparkles,
   AtSign,
   X,
+  Crown,
+  Shield,
+  ChevronDown,
+  UserCheck,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useAuthStore } from '../../stores/authStore';
-import { RoomMember } from '@studyflow/shared';
+import { RoomMember, RoomRole } from '@studyflow/shared';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { cn } from '../../lib/utils';
@@ -73,6 +77,7 @@ export interface ChatMessageItem {
 
 interface AstroRoomChatPanelProps {
   onSendMessage?: (message: string, recipientId?: string) => void;
+  onUpdateMemberRole?: (targetUserId: string, newRole: RoomRole) => void;
   className?: string;
   incomingActivities?: Array<{
     id: string;
@@ -84,15 +89,20 @@ interface AstroRoomChatPanelProps {
     recipientId?: string;
   }>;
   members?: RoomMember[];
+  currentUserRole?: RoomRole;
+  roomOwnerId?: string;
 }
 
 const QUICK_REACTIONS = ['🔥', '👏', '🧠', '☕', '🎯', '💯'];
 
 export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
   onSendMessage,
+  onUpdateMemberRole,
   className = '',
   incomingActivities,
   members,
+  currentUserRole,
+  roomOwnerId,
 }) => {
   const panelRef = useRef<HTMLDivElement>(null);
   const feedScrollRef = useRef<HTMLDivElement>(null);
@@ -100,36 +110,66 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
   const mentionPopoverRef = useRef<HTMLDivElement>(null);
   const contentAreaRef = useRef<HTMLDivElement>(null);
 
+  // Track open role dropdown on member card
+  const [roleMenuOpenMemberId, setRoleMenuOpenMemberId] = useState<string | null>(null);
+
   const authUser = useAuthStore((s) => s.user);
+
+  // Dynamically determine current user's effective role in this room
+  const effectiveRole: RoomRole = useMemo(() => {
+    if (currentUserRole) return currentUserRole;
+    if (roomOwnerId && authUser?.id && authUser.id === roomOwnerId) return 'OWNER';
+    const foundMember = members?.find((m) => m.userId === authUser?.id);
+    if (foundMember) return foundMember.role;
+    return 'MEMBER';
+  }, [currentUserRole, roomOwnerId, authUser?.id, members]);
+
+  const canManageRoles = effectiveRole === 'OWNER';
+
   const currentUser: WorkspaceMember = useMemo(
     () => ({
       id: authUser?.id || 'current-user',
       name: authUser?.name || 'You',
       email: authUser?.email || '',
-      role: 'OWNER',
-      title: 'Workspace Member',
+      role: effectiveRole,
+      title:
+        effectiveRole === 'OWNER'
+          ? 'Room Host'
+          : effectiveRole === 'MODERATOR'
+          ? 'Moderator'
+          : 'Study Mate',
       avatarUrl: authUser?.avatarUrl || '',
       isOnline: true,
     }),
-    [authUser]
+    [authUser, effectiveRole]
   );
 
   const activeMembers: WorkspaceMember[] = useMemo(() => {
     if (members && members.length > 0) {
       return members
         .filter((m) => m.userId !== currentUser.id)
-        .map((m) => ({
-          id: m.userId,
-          name: m.user.name,
-          email: m.user.email,
-          role: m.role,
-          title: m.role === 'OWNER' ? 'Room Host' : m.role === 'MODERATOR' ? 'Moderator' : 'Study Partner',
-          avatarUrl: m.user.avatarUrl || '',
-          isOnline: Boolean(m.isOnline),
-        }));
+        .map((m) => {
+          const isOwner = roomOwnerId ? m.userId === roomOwnerId : m.role === 'OWNER';
+          const role = isOwner ? 'OWNER' : m.role;
+          return {
+            id: m.userId,
+            name: m.user.name,
+            email: m.user.email,
+            role,
+            title: isOwner ? 'Room Host' : role === 'MODERATOR' ? 'Moderator' : 'Study Mate',
+            avatarUrl: m.user.avatarUrl || '',
+            isOnline: Boolean(m.isOnline),
+          };
+        });
     }
-    return WORKSPACE_MEMBERS;
-  }, [members, currentUser.id]);
+    return [];
+  }, [members, currentUser.id, roomOwnerId]);
+
+  // Dynamic online count
+  const onlineCount = useMemo(() => {
+    const othersOnline = activeMembers.filter((m) => m.isOnline).length;
+    return othersOnline + 1; // including current user who is active in this room
+  }, [activeMembers]);
 
   // Active top tab: 'chat' | 'members'
   const [activeTab, setActiveTab] = useState<'chat' | 'members'>('chat');
@@ -399,32 +439,33 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
     const lastAtIdx = textBeforeCursor.lastIndexOf('@');
 
     if (lastAtIdx !== -1) {
-      const query = textBeforeCursor.slice(lastAtIdx + 1);
-      if (!query.includes(' ') || query.length <= 15) {
-        setMentionQuery(query.toLowerCase());
-        setMentionIndex(0);
-        return;
+      const charBeforeAt = lastAtIdx > 0 ? textBeforeCursor[lastAtIdx - 1] : ' ';
+      if (charBeforeAt === ' ' || charBeforeAt === '\n') {
+        const query = textBeforeCursor.slice(lastAtIdx + 1);
+        if (!query.includes(' ') && query.length <= 25) {
+          setMentionQuery(query.toLowerCase());
+          setMentionIndex(0);
+          return;
+        }
       }
     }
     setMentionQuery(null);
   };
 
   const allWorkspaceMembers = useMemo(
-    () => [currentUser, ...activeMembers],
+    () => (activeMembers.length > 0 ? [...activeMembers, currentUser] : [currentUser]),
     [currentUser, activeMembers]
   );
 
-  const filteredMentionMembers = useMemo(
-    () =>
-      mentionQuery !== null
-        ? allWorkspaceMembers.filter(
-            (m) =>
-              m.name.toLowerCase().includes(mentionQuery) ||
-              m.email.toLowerCase().includes(mentionQuery)
-          )
-        : [],
-    [mentionQuery, allWorkspaceMembers]
-  );
+  const filteredMentionMembers = useMemo(() => {
+    if (mentionQuery === null) return [];
+    if (mentionQuery === '') return allWorkspaceMembers;
+    return allWorkspaceMembers.filter(
+      (m) =>
+        m.name.toLowerCase().includes(mentionQuery) ||
+        m.email.toLowerCase().includes(mentionQuery)
+    );
+  }, [mentionQuery, allWorkspaceMembers]);
 
   useGSAP(
     () => {
@@ -727,75 +768,226 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
             <div className="px-1 py-0.5 flex items-center justify-between text-[10px] font-mono text-foreground-muted uppercase tracking-wider">
               <span>Active Participants</span>
-              <span>{activeMembers.length + 1} online</span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span>
+                  {onlineCount} online ({activeMembers.length + 1} total)
+                </span>
+              </span>
             </div>
 
-            {/* Member Cards */}
-            {activeMembers.map((member) => {
-              const unreadCount = unreadDirect[member.id] || 0;
-              return (
-                <div
-                  key={member.id}
-                  className="group flex items-center justify-between p-2 rounded-xl bg-surface-elevated/60 hover:bg-surface-elevated border border-border/80 hover:border-accent/40 transition-all duration-150"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="relative shrink-0">
-                      {member.avatarUrl ? (
-                        <img
-                          src={member.avatarUrl}
-                          alt={member.name}
-                          className="w-7 h-7 rounded-lg object-cover border border-border"
-                        />
-                      ) : (
-                        <div className="w-7 h-7 rounded-lg bg-accent/20 border border-accent/40 text-accent flex items-center justify-center font-bold text-xs">
-                          {(member.name || 'M').charAt(0)}
-                        </div>
-                      )}
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-surface-elevated absolute -bottom-0.5 -right-0.5" />
-                    </div>
-
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <h4 className="text-xs font-semibold text-foreground truncate leading-tight">
-                          {member.name}
-                        </h4>
-                        {unreadCount > 0 && (
-                          <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-rose-500 text-white animate-pulse">
-                            {unreadCount} new
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[10px] text-foreground-muted truncate leading-tight mt-0.5">
-                        {member.title}
-                      </p>
-                    </div>
-                  </div>
-
-                  <Button
-                    onClick={() => handleOpenPrivateChat(member)}
-                    size="sm"
-                    variant={unreadCount > 0 ? 'primary' : 'outline'}
-                    className={cn(
-                      'h-7 px-2.5 text-[10px] rounded-lg transition-all cursor-pointer shrink-0 gap-1 font-medium',
-                      unreadCount > 0
-                        ? 'bg-accent text-white hover:bg-accent-hover shadow-xs'
-                        : 'border-border hover:border-accent text-accent hover:bg-accent hover:text-white'
-                    )}
-                    title={`Direct message ${member.name}`}
-                  >
-                    <MessageSquare className="w-3 h-3" />
-                    <span>{unreadCount > 0 ? 'Reply' : 'Chat'}</span>
-                  </Button>
+            {activeMembers.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center text-foreground-muted space-y-2">
+                <div className="w-9 h-9 rounded-full bg-accent/10 flex items-center justify-center text-accent">
+                  <Users className="w-4 h-4 opacity-75" />
                 </div>
-              );
-            })}
+                <div>
+                  <p className="text-xs font-semibold text-foreground-secondary">
+                    No other study mates yet
+                  </p>
+                  <p className="text-[10px] text-foreground-muted mt-0.5 max-w-[200px]">
+                    Share the room invite code to study and collaborate together!
+                  </p>
+                </div>
+              </div>
+            ) : (
+              activeMembers.map((member) => {
+                const unreadCount = unreadDirect[member.id] || 0;
+                return (
+                  <div
+                    key={member.id}
+                    className="group flex items-center justify-between p-2 rounded-xl bg-surface-elevated/60 hover:bg-surface-elevated border border-border/80 hover:border-accent/40 transition-all duration-150 relative"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="relative shrink-0">
+                        {member.avatarUrl ? (
+                          <img
+                            src={member.avatarUrl}
+                            alt={member.name}
+                            className="w-7 h-7 rounded-lg object-cover border border-border"
+                          />
+                        ) : (
+                          <div className="w-7 h-7 rounded-lg bg-accent/20 border border-accent/40 text-accent flex items-center justify-center font-bold text-xs">
+                            {(member.name || 'M').charAt(0)}
+                          </div>
+                        )}
+                        <span
+                          className={cn(
+                            'w-2 h-2 rounded-full ring-2 ring-surface-elevated absolute -bottom-0.5 -right-0.5 transition-colors',
+                            member.isOnline ? 'bg-emerald-400' : 'bg-foreground-muted/40'
+                          )}
+                          title={member.isOnline ? 'Online' : 'Offline'}
+                        />
+                      </div>
+
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <h4 className="text-xs font-semibold text-foreground truncate leading-tight">
+                            {member.name}
+                          </h4>
+                          {unreadCount > 0 && (
+                            <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-rose-500 text-white animate-pulse">
+                              {unreadCount} new
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          {canManageRoles ? (
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setRoleMenuOpenMemberId(
+                                    roleMenuOpenMemberId === member.id ? null : member.id
+                                  )
+                                }
+                                className={cn(
+                                  'text-[9px] font-mono px-1.5 py-0.5 rounded-md flex items-center gap-1 cursor-pointer transition-colors border',
+                                  member.role === 'OWNER'
+                                    ? 'bg-amber-500/15 text-amber-500 border-amber-500/30'
+                                    : member.role === 'MODERATOR'
+                                    ? 'bg-blue-500/15 text-blue-500 border-blue-500/30 hover:bg-blue-500/25'
+                                    : 'bg-surface-subtle text-foreground-muted hover:text-foreground border-border/60 hover:bg-surface-elevated'
+                                )}
+                                title="Click to manage role"
+                              >
+                                {member.role === 'OWNER' ? (
+                                  <Crown className="w-2.5 h-2.5 text-amber-500" />
+                                ) : member.role === 'MODERATOR' ? (
+                                  <Shield className="w-2.5 h-2.5 text-blue-400" />
+                                ) : null}
+                                <span>{member.title}</span>
+                                {member.role !== 'OWNER' && (
+                                  <ChevronDown className="w-2.5 h-2.5 opacity-60" />
+                                )}
+                              </button>
+
+                              {roleMenuOpenMemberId === member.id && (
+                                <>
+                                  <div
+                                    className="fixed inset-0 z-40"
+                                    onClick={() => setRoleMenuOpenMemberId(null)}
+                                  />
+                                  <div className="absolute left-0 top-full mt-1 w-48 bg-surface-elevated border border-border/80 rounded-xl shadow-xl p-1 z-50 space-y-0.5 text-xs backdrop-blur-xl animate-in fade-in zoom-in-95 duration-100">
+                                    <div className="px-2 py-1 text-[9px] font-mono uppercase text-foreground-muted border-b border-border/50">
+                                      Change Role: {member.name.split(' ')[0]}
+                                    </div>
+
+                                    {member.role !== 'MODERATOR' && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setRoleMenuOpenMemberId(null);
+                                          if (onUpdateMemberRole) {
+                                            onUpdateMemberRole(member.id, 'MODERATOR');
+                                          }
+                                        }}
+                                        className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-[11px] text-foreground hover:bg-surface-subtle transition-colors cursor-pointer"
+                                      >
+                                        <Shield className="w-3 h-3 text-blue-400 shrink-0" />
+                                        <span>Promote to Moderator</span>
+                                      </button>
+                                    )}
+
+                                    {member.role !== 'MEMBER' && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setRoleMenuOpenMemberId(null);
+                                          if (onUpdateMemberRole) {
+                                            onUpdateMemberRole(member.id, 'MEMBER');
+                                          }
+                                        }}
+                                        className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-[11px] text-foreground hover:bg-surface-subtle transition-colors cursor-pointer"
+                                      >
+                                        <UserCheck className="w-3 h-3 text-foreground-muted shrink-0" />
+                                        <span>Demote to Study Mate</span>
+                                      </button>
+                                    )}
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setRoleMenuOpenMemberId(null);
+                                        if (
+                                          window.confirm(
+                                            `Transfer Room Host to ${member.name}? You will step down to Moderator.`
+                                          )
+                                        ) {
+                                          if (onUpdateMemberRole) {
+                                            onUpdateMemberRole(member.id, 'OWNER');
+                                          }
+                                        }
+                                      }}
+                                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-[11px] text-amber-500 hover:bg-amber-500/10 transition-colors cursor-pointer"
+                                    >
+                                      <Crown className="w-3 h-3 shrink-0" />
+                                      <span>Transfer Room Host</span>
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          ) : (
+                            <span
+                              className={cn(
+                                'text-[9px] font-mono px-1.5 py-0.5 rounded-md flex items-center gap-1 border',
+                                member.role === 'OWNER'
+                                  ? 'bg-amber-500/15 text-amber-500 border-amber-500/30'
+                                  : member.role === 'MODERATOR'
+                                  ? 'bg-blue-500/15 text-blue-500 border-blue-500/30'
+                                  : 'bg-surface-subtle text-foreground-muted border-border/60'
+                              )}
+                            >
+                              {member.role === 'OWNER' ? (
+                                <Crown className="w-2.5 h-2.5 text-amber-500" />
+                              ) : member.role === 'MODERATOR' ? (
+                                <Shield className="w-2.5 h-2.5 text-blue-400" />
+                              ) : null}
+                              <span>{member.title}</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <Button
+                      onClick={() => handleOpenPrivateChat(member)}
+                      size="sm"
+                      variant={unreadCount > 0 ? 'primary' : 'outline'}
+                      className={cn(
+                        'h-7 px-2.5 text-[10px] rounded-lg transition-all cursor-pointer shrink-0 gap-1 font-medium',
+                        unreadCount > 0
+                          ? 'bg-accent text-white hover:bg-accent-hover shadow-xs'
+                          : 'border-border hover:border-accent text-accent hover:bg-accent hover:text-white'
+                      )}
+                      title={`Direct message ${member.name}`}
+                    >
+                      <MessageSquare className="w-3 h-3" />
+                      <span>{unreadCount > 0 ? 'Reply' : 'Chat'}</span>
+                    </Button>
+                  </div>
+                );
+              })
+            )}
 
             {/* Current User Card */}
             <div className="pt-2 mt-2 border-t border-border/60">
               <div className="flex items-center justify-between p-2 rounded-xl bg-surface-subtle/80 border border-border/60">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-7 h-7 rounded-lg bg-accent/20 border border-accent/40 flex items-center justify-center text-xs text-accent font-bold shrink-0">
-                    {(currentUser.name || 'U').charAt(0)}
+                  <div className="relative shrink-0">
+                    {currentUser.avatarUrl ? (
+                      <img
+                        src={currentUser.avatarUrl}
+                        alt={currentUser.name}
+                        className="w-7 h-7 rounded-lg object-cover border border-border"
+                      />
+                    ) : (
+                      <div className="w-7 h-7 rounded-lg bg-accent/20 border border-accent/40 flex items-center justify-center text-xs text-accent font-bold">
+                        {(currentUser.name || 'U').charAt(0)}
+                      </div>
+                    )}
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-surface-elevated absolute -bottom-0.5 -right-0.5" />
                   </div>
                   <div className="min-w-0">
                     <h4 className="text-xs font-semibold text-foreground truncate leading-tight">
@@ -806,8 +998,25 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
                     </p>
                   </div>
                 </div>
-                <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30 font-semibold">
-                  Host
+                <span
+                  className={cn(
+                    'text-[9px] font-mono px-2 py-0.5 rounded-full font-semibold border flex items-center gap-1',
+                    effectiveRole === 'OWNER'
+                      ? 'bg-amber-500/15 text-amber-500 border-amber-500/30'
+                      : effectiveRole === 'MODERATOR'
+                      ? 'bg-blue-500/15 text-blue-500 border-blue-500/30'
+                      : 'bg-accent/15 text-accent border border-accent/30'
+                  )}
+                >
+                  {effectiveRole === 'OWNER' && <Crown className="w-2.5 h-2.5" />}
+                  {effectiveRole === 'MODERATOR' && <Shield className="w-2.5 h-2.5" />}
+                  <span>
+                    {effectiveRole === 'OWNER'
+                      ? 'Host'
+                      : effectiveRole === 'MODERATOR'
+                      ? 'Moderator'
+                      : 'Study Mate'}
+                  </span>
                 </span>
               </div>
             </div>
@@ -894,53 +1103,77 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
         )}
       </div>
 
-      {/* Mention Autocomplete Popover */}
-      {mentionQuery !== null && filteredMentionMembers.length > 0 && (
-        <div
-          ref={mentionPopoverRef}
-          className="absolute bottom-full mb-1.5 inset-x-3 bg-surface-elevated border border-accent/40 rounded-xl shadow-2xl p-1 z-30 space-y-0.5 backdrop-blur-xl"
-        >
-          <div className="px-2 py-1 border-b border-border flex items-center justify-between text-[9px] font-mono text-foreground-muted">
-            <span>MENTION MEMBER</span>
-            <span>↑↓ navigate • ↵ select</span>
-          </div>
-
-          <div className="max-h-32 overflow-y-auto py-0.5 space-y-0.5">
-            {filteredMentionMembers.map((member, index) => (
-              <button
-                key={member.id}
-                type="button"
-                onClick={() => handleSelectMention(member)}
-                className={cn(
-                  'w-full flex items-center gap-2 px-2 py-1 rounded-lg text-left text-xs transition-colors cursor-pointer',
-                  index === mentionIndex
-                    ? 'bg-accent text-white font-medium'
-                    : 'text-foreground hover:bg-surface-subtle'
-                )}
-              >
-                {member.avatarUrl ? (
-                  <img
-                    src={member.avatarUrl}
-                    alt={member.name}
-                    className="w-4 h-4 rounded-full object-cover shrink-0"
-                  />
-                ) : (
-                  <div className="w-4 h-4 rounded-full bg-accent/20 flex items-center justify-center text-[9px] text-accent font-bold shrink-0">
-                    {member.name.charAt(0)}
-                  </div>
-                )}
-                <span className="truncate flex-1 text-xs">{member.name}</span>
-                <span className="text-[9px] opacity-70 font-mono shrink-0">
-                  {member.role}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Bottom Message Input Strip */}
-      <div className="p-2.5 bg-surface-elevated/70 border-t border-border/80 shrink-0 space-y-2">
+      <div className="p-2.5 bg-surface-elevated/70 border-t border-border/80 shrink-0 space-y-2 relative">
+        {/* Mention Autocomplete Popover */}
+        {mentionQuery !== null && filteredMentionMembers.length > 0 && (
+          <div
+            ref={mentionPopoverRef}
+            className="absolute bottom-full mb-2 left-2.5 right-2.5 bg-surface-elevated/95 border border-accent/40 rounded-xl shadow-2xl p-1.5 z-50 space-y-1 backdrop-blur-xl"
+          >
+            <div className="px-2 py-1 border-b border-border/60 flex items-center justify-between text-[9px] font-mono text-foreground-muted">
+              <span className="flex items-center gap-1 font-semibold text-accent">
+                <AtSign className="w-3 h-3" />
+                <span>MENTION STUDY MATE</span>
+              </span>
+              <span>↑↓ navigate • ↵ select</span>
+            </div>
+
+            <div className="max-h-40 overflow-y-auto py-0.5 space-y-0.5">
+              {filteredMentionMembers.map((member, index) => (
+                <button
+                  key={member.id}
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    handleSelectMention(member);
+                  }}
+                  className={cn(
+                    'w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left text-xs transition-colors cursor-pointer',
+                    index === mentionIndex
+                      ? 'bg-accent text-white font-medium shadow-xs'
+                      : 'text-foreground hover:bg-surface-subtle'
+                  )}
+                >
+                  <div className="relative shrink-0">
+                    {member.avatarUrl ? (
+                      <img
+                        src={member.avatarUrl}
+                        alt={member.name}
+                        className="w-5 h-5 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-5 h-5 rounded-full bg-accent/20 flex items-center justify-center text-[10px] text-accent font-bold">
+                        {member.name.charAt(0)}
+                      </div>
+                    )}
+                    <span
+                      className={cn(
+                        'w-1.5 h-1.5 rounded-full ring-1 ring-surface-elevated absolute -bottom-0.5 -right-0.5',
+                        member.isOnline ? 'bg-emerald-400' : 'bg-foreground-muted/40'
+                      )}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="truncate block font-medium">
+                      {member.name} {member.id === currentUser.id && '(You)'}
+                    </span>
+                  </div>
+                  <span
+                    className={cn(
+                      'text-[9px] font-mono px-1.5 py-0.5 rounded-full shrink-0',
+                      index === mentionIndex
+                        ? 'bg-white/20 text-white'
+                        : 'bg-surface-subtle text-foreground-muted border border-border/60'
+                    )}
+                  >
+                    {member.title}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {/* Quick Reaction Emojis & Hint */}
         <div className="flex items-center justify-between px-0.5">
           <div className="flex items-center gap-1">

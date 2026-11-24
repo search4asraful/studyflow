@@ -455,7 +455,7 @@ export class RoomService {
     targetUserId: string,
     newRole: RoomRole,
     requestingUserId: string
-  ): Promise<void> {
+  ): Promise<{ previousRole: RoomRole; newRole: RoomRole; newOwnerId?: string }> {
     const room = await prisma.studyRoom.findUnique({
       where: { id: roomId },
     });
@@ -466,16 +466,57 @@ export class RoomService {
       throw new ForbiddenError('Only the room owner can manage roles');
     }
 
-    if (targetUserId === room.ownerId) {
-      throw new BadRequestError('Cannot change the owner role');
+    if (targetUserId === requestingUserId) {
+      throw new BadRequestError('Cannot change your own role directly');
     }
 
-    await prisma.roomMember.update({
+    const targetMember = await prisma.roomMember.findUnique({
       where: {
         roomId_userId: { roomId, userId: targetUserId },
       },
-      data: { role: newRole },
     });
+
+    if (!targetMember) {
+      throw new NotFoundError('Target user is not a member of this room');
+    }
+
+    const previousRole = targetMember.role;
+
+    if (newRole === RoomRole.OWNER) {
+      // Transfer room ownership to target user and demote old owner to MODERATOR
+      await prisma.$transaction([
+        prisma.studyRoom.update({
+          where: { id: roomId },
+          data: { ownerId: targetUserId },
+        }),
+        prisma.roomMember.update({
+          where: { roomId_userId: { roomId, userId: targetUserId } },
+          data: { role: RoomRole.OWNER },
+        }),
+        prisma.roomMember.update({
+          where: { roomId_userId: { roomId, userId: requestingUserId } },
+          data: { role: RoomRole.MODERATOR },
+        }),
+      ]);
+
+      return {
+        previousRole,
+        newRole: RoomRole.OWNER,
+        newOwnerId: targetUserId,
+      };
+    } else {
+      await prisma.roomMember.update({
+        where: {
+          roomId_userId: { roomId, userId: targetUserId },
+        },
+        data: { role: newRole },
+      });
+
+      return {
+        previousRole,
+        newRole,
+      };
+    }
   }
 
   static async kickMember(
