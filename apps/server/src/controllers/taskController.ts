@@ -39,4 +39,24 @@ export class TaskController {
       next(error);
     }
   }
+
+  static async claimTask(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = req.params.id as string;
+      const task = await TaskService.claimTask(id, req.user!.id);
+      res.status(200).json({ success: true, data: task });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async unassignTask(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = req.params.id as string;
+      const task = await TaskService.unassignTask(id, req.user!.id);
+      res.status(200).json({ success: true, data: task });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

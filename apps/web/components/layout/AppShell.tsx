@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '../../stores/authStore';
 import { Navbar } from './Navbar';
@@ -18,19 +18,23 @@ export const AppShell: React.FC<AppShellProps> = ({ children, fullWidth = false 
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const isLoading = useAuthStore((s) => s.isLoading);
+  const isInitialized = useAuthStore((s) => s.isInitialized);
   const checkAuth = useAuthStore((s) => s.checkAuth);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     checkAuth();
   }, [checkAuth]);
 
   useEffect(() => {
-    if (!isLoading && !user) {
+    if (mounted && isInitialized && !isLoading && !user) {
       router.push('/login');
     }
-  }, [isLoading, user, router]);
+  }, [mounted, isInitialized, isLoading, user, router]);
 
-  if (isLoading) {
+  // Show loading spinner while mounting (SSR match) or verifying auth when user is not cached
+  if (!mounted || (!user && (isLoading || !isInitialized))) {
     return (
       <div className="min-h-screen bg-canvas flex flex-col items-center justify-center gap-3">
         <div className="relative">
@@ -62,7 +66,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, fullWidth = false 
           <main
             className={
               fullWidth
-                ? 'flex-1 p-2 sm:p-3 md:p-3.5 pb-20 md:pb-3.5 w-full flex flex-col min-h-0 overflow-hidden'
+                ? 'flex-1 p-0 sm:p-2 md:p-3 w-full flex flex-col min-h-0 overflow-hidden'
                 : 'flex-1 p-4 sm:p-6 md:p-8 pb-20 md:pb-8 max-w-7xl mx-auto w-full overflow-x-hidden'
             }
           >
@@ -70,7 +74,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, fullWidth = false 
           </main>
         </div>
       </div>
-      <MobileNav />
+      {!fullWidth && <MobileNav />}
     </div>
   );
 };

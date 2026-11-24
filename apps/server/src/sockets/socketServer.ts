@@ -261,6 +261,92 @@ export function setupSocketServer(httpServer: HttpServer): SocketIOServer {
       }
     });
 
+    socket.on(SOCKET_EVENTS.CLIENT.TASK_CLAIM, async (data: { taskId: string }, callback) => {
+      try {
+        const task = await TaskService.claimTask(data.taskId, user.id);
+        if (typeof callback === 'function') callback({ success: true, data: task });
+      } catch (err: any) {
+        if (typeof callback === 'function') {
+          callback({ success: false, error: err.message });
+        } else {
+          socket.emit(SOCKET_EVENTS.SERVER.ROOM_ERROR, { message: err.message });
+        }
+      }
+    });
+
+    socket.on(SOCKET_EVENTS.CLIENT.TASK_UNASSIGN, async (data: { taskId: string }, callback) => {
+      try {
+        const task = await TaskService.unassignTask(data.taskId, user.id);
+        if (typeof callback === 'function') callback({ success: true, data: task });
+      } catch (err: any) {
+        if (typeof callback === 'function') {
+          callback({ success: false, error: err.message });
+        } else {
+          socket.emit(SOCKET_EVENTS.SERVER.ROOM_ERROR, { message: err.message });
+        }
+      }
+    });
+
+    // Member role update (promote / demote / transfer host)
+    socket.on(
+      SOCKET_EVENTS.CLIENT.MEMBER_ROLE_UPDATE,
+      async (data: { roomId: string; targetUserId: string; newRole: any }, callback) => {
+        try {
+          const { roomId, targetUserId, newRole } = data;
+          if (!roomId || !targetUserId || !newRole) {
+            throw new Error('Room ID, target user ID, and new role are required');
+          }
+
+          const result = await RoomService.updateMemberRole(roomId, targetUserId, newRole, user.id);
+
+          const targetUser = await prisma.user.findUnique({
+            where: { id: targetUserId },
+            select: { name: true },
+          });
+          const targetName = targetUser?.name || 'Member';
+
+          const roleLabels: Record<string, string> = {
+            OWNER: 'Room Host',
+            MODERATOR: 'Moderator',
+            MEMBER: 'Study Mate',
+          };
+          const newLabel = roleLabels[newRole] || newRole;
+
+          // Broadcast to all participants in this room
+          io.to(`room:${roomId}`).emit(SOCKET_EVENTS.SERVER.MEMBER_ROLE_UPDATED, {
+            roomId,
+            targetUserId,
+            newRole,
+            previousRole: result.previousRole,
+            newOwnerId: result.newOwnerId,
+            updatedByUserId: user.id,
+          });
+
+          // Activity announcement
+          const actionText =
+            newRole === 'OWNER'
+              ? `${user.name} transferred Room Host to ${targetName}`
+              : result.previousRole === 'MEMBER' && newRole === 'MODERATOR'
+              ? `${user.name} promoted ${targetName} to Moderator`
+              : result.previousRole === 'MODERATOR' && newRole === 'MEMBER'
+              ? `${user.name} demoted ${targetName} to Study Mate`
+              : `${user.name} updated ${targetName}'s role to ${newLabel}`;
+
+          RoomActivityService.broadcastActivity(roomId, {
+            userId: user.id,
+            userName: user.name,
+            action: 'MEMBER_ROLE_UPDATED',
+            details: actionText,
+          });
+
+          if (typeof callback === 'function') callback({ success: true, data: result });
+        } catch (err: any) {
+          socket.emit(SOCKET_EVENTS.SERVER.ROOM_ERROR, { message: err.message });
+          if (typeof callback === 'function') callback({ success: false, error: err.message });
+        }
+      }
+    );
+
     // Participant heartbeat
     socket.on(SOCKET_EVENTS.CLIENT.PARTICIPANT_HEARTBEAT, async (data: { roomId: string }) => {
       if (data?.roomId && socket.data.joinedRooms.has(data.roomId)) {

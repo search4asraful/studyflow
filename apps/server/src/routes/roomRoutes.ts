@@ -19,6 +19,7 @@ roomRouter.get('/:id', RoomController.getRoomDetails);
 roomRouter.patch('/:id', validateBody(updateRoomSchema), RoomController.updateRoom);
 roomRouter.delete('/:id', RoomController.deleteRoom);
 roomRouter.post('/:id/leave', RoomController.leaveRoom);
+roomRouter.patch('/:id/members/:userId/role', RoomController.updateMemberRole);
 
 // REST Fallback for Timer Controls
 roomRouter.post('/:id/timer/start', RoomController.startTimer);

@@ -21,8 +21,11 @@ export const SOCKET_EVENTS = {
     TASK_CREATE: 'task:create',
     TASK_UPDATE: 'task:update',
     TASK_DELETE: 'task:delete',
+    TASK_CLAIM: 'task:claim',
+    TASK_UNASSIGN: 'task:unassign',
     PARTICIPANT_HEARTBEAT: 'participant:heartbeat',
     ROOM_CHAT: 'room:chat',
+    MEMBER_ROLE_UPDATE: 'room:member-role-update',
   },
   SERVER: {
     ROOM_STATE: 'room:state',
@@ -36,6 +39,7 @@ export const SOCKET_EVENTS = {
     TASK_DELETED: 'task:deleted',
     ROOM_ACTIVITY: 'room:activity',
     ROOM_ERROR: 'room:error',
+    MEMBER_ROLE_UPDATED: 'room:member-role-updated',
   },
 } as const;
 

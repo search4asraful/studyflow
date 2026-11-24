@@ -1,34 +1,51 @@
 'use client';
 
 import { useGSAP } from '@gsap/react';
-import { Task, TaskPriority, TaskStatus } from '@studyflow/shared';
+import { RoomMember, RoomRole, Task, TaskPriority, TaskStatus } from '@studyflow/shared';
 import { format } from 'date-fns';
 import gsap from 'gsap';
 import {
-    ArrowLeft,
-    ArrowRight,
-    CheckCircle2,
-    Clock,
-    Filter,
-    GripVertical,
-    Plus,
-    Search,
-    Trash2,
-    User,
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  Clock,
+  Filter,
+  GripVertical,
+  Loader2,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  User,
+  UserPlus,
+  X,
+  Target,
 } from 'lucide-react';
+import Link from 'next/link';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { playTaskCompletionSound } from '../../lib/audio';
 import { triggerConfetti } from '../../lib/confetti';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/Button';
+import { EditTaskModal } from './EditTaskModal';
+import { toast } from 'sonner';
 
 export interface WorkspaceKanbanProps {
   tasks?: Task[];
   onUpdateTask?: (taskId: string, updates: Partial<Task>) => void;
   onDeleteTask?: (taskId: string) => void;
+  onEditTask?: (task: Task) => void;
+  onClaimTask?: (taskId: string) => Promise<any> | void;
+  currentUserId?: string;
+  currentUserRole?: RoomRole | string;
+  roomOwnerId?: string;
   onOpenCreateModal?: () => void;
   onActivityLog?: (action: string, details?: string) => void;
   className?: string;
+  showRoomLink?: boolean;
+  members?: RoomMember[];
+  activeTaskId?: string | null;
+  onSelectFocusTask?: (task: Task) => void;
 }
 
 // 8 Realistic Group Astro engineering workspace tasks (2 in each column)
@@ -61,14 +78,8 @@ export const INITIAL_ASTRO_TASKS: Task[] = [
     description: 'Define CAN bus high-voltage discharge threshold alerts and real-time state machine monitors.',
     status: 'BACKLOG',
     priority: 'LOW',
-    assigneeId: 'sarah-chen',
-    assignee: {
-      id: 'sarah-chen',
-      name: 'Dr. Sarah Chen',
-      email: 'sarah.chen@astro.io',
-      avatarUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=100&auto=format&fit=crop&q=80',
-      createdAt: new Date().toISOString(),
-    },
+    assigneeId: null,
+    assignee: null,
     createdById: 'owner-1',
     dueDate: '2026-12-02',
     position: 1,
@@ -251,9 +262,18 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
   tasks: propTasks,
   onUpdateTask,
   onDeleteTask,
+  onEditTask,
+  onClaimTask,
+  currentUserId,
+  currentUserRole,
+  roomOwnerId,
   onOpenCreateModal,
   onActivityLog,
   className = '',
+  showRoomLink = false,
+  members = [],
+  activeTaskId,
+  onSelectFocusTask,
 }) => {
   // Use prop tasks if provided, otherwise fall back to demo tasks
   const [localTasks, setLocalTasks] = useState<Task[]>(() => {
@@ -267,11 +287,68 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
     }
   }, [propTasks]);
 
+  const [claimingTaskIds, setClaimingTaskIds] = useState<Set<string>>(new Set());
+
+  // Permission gate: Only task creator, room host (OWNER), or room moderator can edit/delete/move/reopen tasks
+  const canUserManageTask = (task: Task): boolean => {
+    if (!currentUserId) return true;
+    if (task.createdById === currentUserId) return true;
+    if (currentUserRole === 'OWNER' || (roomOwnerId && roomOwnerId === currentUserId)) return true;
+    if (currentUserRole === 'MODERATOR') return true;
+    const userMember = members.find((m) => m.userId === currentUserId);
+    if (userMember?.role === 'OWNER' || userMember?.role === 'MODERATOR') return true;
+    return false;
+  };
+
+  const handleClaimTask = async (taskId: string) => {
+    if (claimingTaskIds.has(taskId)) return;
+    setClaimingTaskIds((prev) => new Set(prev).add(taskId));
+    try {
+      if (onClaimTask) {
+        await onClaimTask(taskId);
+      } else {
+        // Fallback for standalone / demo mode
+        const memberUser = members.find((m) => m.userId === currentUserId)?.user || {
+          id: currentUserId || 'me',
+          name: 'You',
+          email: '',
+          avatarUrl: null,
+          bio: null,
+          createdAt: new Date().toISOString(),
+        };
+        setLocalTasks((prev) =>
+          prev.map((t) =>
+            t.id === taskId
+              ? {
+                  ...t,
+                  assigneeId: memberUser.id,
+                  assignee: {
+                    id: memberUser.id,
+                    name: memberUser.name,
+                    email: memberUser.email,
+                    avatarUrl: memberUser.avatarUrl || null,
+                    createdAt: new Date().toISOString(),
+                  },
+                }
+              : t
+          )
+        );
+      }
+    } finally {
+      setClaimingTaskIds((prev) => {
+        const next = new Set(prev);
+        next.delete(taskId);
+        return next;
+      });
+    }
+  };
+
   const [searchQuery, setSearchQuery] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
   const [dragOverColumnId, setDragOverColumnId] = useState<TaskStatus | null>(null);
   const [activeMobileColumn, setActiveMobileColumn] = useState<TaskStatus>('TODO');
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
@@ -320,7 +397,17 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
     const task = localTasks.find((t) => t.id === taskId);
     if (!task) return;
 
+    if (!canUserManageTask(task)) {
+      toast.error('Only the task creator, room host, or moderator can move this task');
+      return;
+    }
+
     const oldStatus = task.status;
+    // Don't trigger updates or activity if released back to original status
+    if (oldStatus === newStatus) {
+      return;
+    }
+
     const isNowCompleted = newStatus === 'COMPLETED' && oldStatus !== 'COMPLETED';
 
     setLocalTasks((prev) => {
@@ -360,15 +447,54 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
       }
     }, 20);
 
-    // Activity log notification
+    // Activity log notification - only when status changed
     if (onActivityLog) {
       const colName = KANBAN_COLUMNS.find((c) => c.id === newStatus)?.title || newStatus;
       onActivityLog('TASK_UPDATED', `Moved "${task.title}" to ${colName}`);
     }
   };
 
+  const handleSaveEditedTask = (taskId: string, updates: Partial<Task>) => {
+    const existing = localTasks.find((t) => t.id === taskId);
+    if (existing && !canUserManageTask(existing)) {
+      toast.error('Only the task creator, room host, or moderator can edit this task');
+      return;
+    }
+
+    setLocalTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t))
+    );
+
+    if (onUpdateTask) {
+      onUpdateTask(taskId, updates);
+    }
+
+    if (onActivityLog && existing) {
+      if (updates.status && updates.status !== existing.status) {
+        const colName = KANBAN_COLUMNS.find((c) => c.id === updates.status)?.title || updates.status;
+        onActivityLog('TASK_UPDATED', `Moved "${updates.title || existing.title}" to ${colName}`);
+      } else {
+        onActivityLog('TASK_UPDATED', `Updated task "${updates.title || existing.title}"`);
+      }
+    }
+
+    if (onEditTask && existing) {
+      onEditTask({ ...existing, ...updates });
+    }
+
+    setEditingTask(null);
+  };
+
   const handleDeleteTask = (taskId: string) => {
-    const task = localTasks.find((t) => t.id === taskId);
+    const task = localTasks.find((t) => t.id === taskId) || propTasks?.find((t) => t.id === taskId);
+    if (task && !canUserManageTask(task)) {
+      toast.error('Only the task creator, room host, or moderator can delete this task');
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to delete "${task?.title || 'this task'}"?`)) {
+      return;
+    }
     setLocalTasks((prev) => prev.filter((t) => t.id !== taskId));
     if (onDeleteTask) {
       onDeleteTask(taskId);
@@ -380,6 +506,13 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
 
   // Drag Handlers
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, taskId: string) => {
+    const task = localTasks.find((t) => t.id === taskId);
+    if (task && !canUserManageTask(task)) {
+      e.preventDefault();
+      toast.error('Only the task creator, room host, or moderator can move this task');
+      return;
+    }
+
     setDraggingTaskId(taskId);
     e.dataTransfer.setData('text/plain', taskId);
     e.dataTransfer.effectAllowed = 'move';
@@ -414,6 +547,11 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
     setDraggingTaskId(null);
 
     if (taskId) {
+      const task = localTasks.find((t) => t.id === taskId);
+      if (task && !canUserManageTask(task)) {
+        toast.error('Only the task creator, room host, or moderator can move this task');
+        return;
+      }
       handleMoveTaskStatus(taskId, colId);
     }
   };
@@ -451,17 +589,17 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
           </div>
 
           {/* Add Room Task CTA Button */}
-          <Button
-            onClick={() => {
-              if (onOpenCreateModal) onOpenCreateModal();
-            }}
-            size="sm"
-            className="h-8 px-2.5 sm:px-3 btn-primary bg-accent hover:bg-accent-hover active:scale-95 text-white shadow-xs rounded-lg font-semibold text-xs gap-1.5 whitespace-nowrap cursor-pointer transition-all shrink-0"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span className="hidden xs:inline">Add Task</span>
-            <span className="xs:hidden">Task</span>
-          </Button>
+          {onOpenCreateModal && (
+            <Button
+              onClick={onOpenCreateModal}
+              size="sm"
+              className="h-8 px-2.5 sm:px-3 btn-primary bg-accent hover:bg-accent-hover active:scale-95 text-white shadow-xs rounded-lg font-semibold text-xs gap-1.5 whitespace-nowrap cursor-pointer transition-all shrink-0"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span className="hidden xs:inline">Add Task</span>
+              <span className="xs:hidden">Task</span>
+            </Button>
+          )}
         </div>
 
         {/* Overall Task Progress Strip */}
@@ -592,6 +730,14 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
                       onDragEnd={handleDragEnd}
                       onMoveStatus={handleMoveTaskStatus}
                       onDelete={handleDeleteTask}
+                      onEdit={(t) => setEditingTask(t)}
+                      onClaim={handleClaimTask}
+                      currentUserId={currentUserId}
+                      canManage={canUserManageTask(task)}
+                      isClaiming={claimingTaskIds.has(task.id)}
+                      showRoomLink={showRoomLink}
+                      isActiveFocus={activeTaskId === task.id}
+                      onSelectFocus={onSelectFocusTask}
                     />
                   ))
                 )}
@@ -663,6 +809,14 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
                       onDragEnd={handleDragEnd}
                       onMoveStatus={handleMoveTaskStatus}
                       onDelete={handleDeleteTask}
+                      onEdit={(t) => setEditingTask(t)}
+                      onClaim={handleClaimTask}
+                      currentUserId={currentUserId}
+                      canManage={canUserManageTask(task)}
+                      isClaiming={claimingTaskIds.has(task.id)}
+                      showRoomLink={showRoomLink}
+                      isActiveFocus={activeTaskId === task.id}
+                      onSelectFocus={onSelectFocusTask}
                     />
                   ))
                 )}
@@ -671,6 +825,15 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
           );
         })}
       </div>
+
+      {/* Modal for Editing Tasks */}
+      <EditTaskModal
+        isOpen={!!editingTask}
+        onClose={() => setEditingTask(null)}
+        onSubmit={handleSaveEditedTask}
+        task={editingTask}
+        members={members}
+      />
     </div>
   );
 };
@@ -683,6 +846,14 @@ interface KanbanTaskCardProps {
   onDragEnd: (e: React.DragEvent<HTMLDivElement>) => void;
   onMoveStatus: (taskId: string, newStatus: TaskStatus) => void;
   onDelete: (taskId: string) => void;
+  onEdit?: (task: Task) => void;
+  onClaim?: (taskId: string) => Promise<any> | void;
+  currentUserId?: string;
+  canManage?: boolean;
+  isClaiming?: boolean;
+  showRoomLink?: boolean;
+  isActiveFocus?: boolean;
+  onSelectFocus?: (task: Task) => void;
 }
 
 const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
@@ -692,8 +863,21 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
   onDragEnd,
   onMoveStatus,
   onDelete,
+  onEdit,
+  onClaim,
+  currentUserId,
+  canManage = true,
+  isClaiming = false,
+  showRoomLink = false,
+  isActiveFocus = false,
+  onSelectFocus,
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
+
+  const isAssignedToCurrentUser = Boolean(
+    currentUserId &&
+      (task.assigneeId === currentUserId || task.assignee?.id === currentUserId)
+  );
 
   const priorityStyles: Record<
     TaskPriority,
@@ -734,11 +918,12 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
       <div
         id={`kanban-card-${task.id}`}
         ref={cardRef}
-        draggable={true}
-        onDragStart={onDragStart}
-        onDragEnd={onDragEnd}
+        draggable={canManage}
+        onDragStart={canManage ? onDragStart : undefined}
+        onDragEnd={canManage ? onDragEnd : undefined}
         className={cn(
-          'group relative overflow-hidden bg-surface/50 hover:bg-surface-elevated/80 border border-border-subtle hover:border-emerald-500/40 rounded-xl p-2.5 transition-all duration-200 cursor-grab active:cursor-grabbing shadow-2xs opacity-85 hover:opacity-100',
+          'group relative overflow-hidden bg-surface/50 hover:bg-surface-elevated/80 border border-border-subtle hover:border-emerald-500/40 rounded-xl p-2.5 transition-all duration-200 shadow-2xs opacity-85 hover:opacity-100',
+          canManage ? 'cursor-grab active:cursor-grabbing' : 'cursor-default',
           isDragging && 'opacity-40 scale-[1.02] shadow-2xl rotate-1 border-accent ring-2 ring-accent/40'
         )}
       >
@@ -761,21 +946,38 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
           >
             {pConfig.label}
           </span>
-          <div className="flex items-center gap-1 opacity-80 sm:opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-            <button
-              type="button"
-              draggable={false}
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete(task.id);
-              }}
-              className="text-foreground-muted hover:text-rose-500 hover:bg-rose-500/10 p-0.5 rounded transition-colors cursor-pointer"
-              title="Delete task"
-            >
-              <Trash2 className="w-3 h-3" />
-            </button>
-          </div>
+          {canManage && (
+            <div className="flex items-center gap-1 opacity-80 sm:opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+              {onEdit && (
+                <button
+                  type="button"
+                  draggable={false}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit(task);
+                  }}
+                  className="text-foreground-muted hover:text-accent hover:bg-accent/10 p-0.5 rounded transition-colors cursor-pointer"
+                  title="Edit task"
+                >
+                  <Pencil className="w-3 h-3" />
+                </button>
+              )}
+              <button
+                type="button"
+                draggable={false}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(task.id);
+                }}
+                className="text-foreground-muted hover:text-rose-500 hover:bg-rose-500/10 p-0.5 rounded transition-colors cursor-pointer"
+                title="Delete task"
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Completed Compact Bottom Row: Assignee + Reopen */}
@@ -797,27 +999,71 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
                 <span className="truncate max-w-20 text-[10px] text-foreground-muted">
                   {task.assignee.name.split(' ')[0]}
                 </span>
+                {isAssignedToCurrentUser && (
+                  <span className="inline-flex items-center text-[9px] text-accent font-semibold ml-0.5">
+                    (You)
+                  </span>
+                )}
               </div>
+            ) : onClaim ? (
+              <button
+                type="button"
+                draggable={false}
+                disabled={isClaiming}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClaim(task.id);
+                }}
+                className={cn(
+                  'inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded border transition-all cursor-pointer font-sans shadow-2xs',
+                  isClaiming
+                    ? 'bg-accent/20 text-accent border-accent/40 cursor-wait opacity-80'
+                    : 'bg-accent/15 text-accent hover:bg-accent hover:text-white border-accent/30 active:scale-95'
+                )}
+                title="Assign to me"
+              >
+                {isClaiming ? (
+                  <Loader2 className="w-2.5 h-2.5 animate-spin shrink-0" />
+                ) : (
+                  <UserPlus className="w-2.5 h-2.5 shrink-0" />
+                )}
+                <span>{isClaiming ? 'Assigning...' : 'Assign to me'}</span>
+              </button>
             ) : (
               <span>Unassigned</span>
             )}
           </div>
 
-          {prevStatus && (
-            <button
-              type="button"
-              draggable={false}
-              onClick={(e) => {
-                e.stopPropagation();
-                onMoveStatus(task.id, prevStatus);
-              }}
-              className="inline-flex items-center gap-1 bg-surface-subtle hover:bg-surface-elevated active:scale-95 py-0.5 px-2 rounded-md transition-all cursor-pointer text-foreground-muted hover:text-accent border border-border/60 text-[10px]"
-              title={`Reopen to ${prevStatus.replace('_', ' ')}`}
-            >
-              <ArrowLeft className="w-2.5 h-2.5" />
-              <span>Reopen</span>
-            </button>
-          )}
+          <div className="flex items-center gap-1.5">
+            {showRoomLink && task.roomId && (
+              <Link
+                href={`/rooms/${task.roomId}`}
+                draggable={false}
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-0.5 text-[9px] text-accent hover:text-accent-hover font-medium bg-accent/10 hover:bg-accent/20 px-1.5 py-0.5 rounded border border-accent/25 transition-colors shrink-0"
+                title="View in Study Room"
+              >
+                <span>Room</span>
+                <ArrowRight className="w-2.5 h-2.5" />
+              </Link>
+            )}
+            {canManage && prevStatus && (
+              <button
+                type="button"
+                draggable={false}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onMoveStatus(task.id, prevStatus);
+                }}
+                className="inline-flex items-center gap-1 bg-surface-subtle hover:bg-surface-elevated active:scale-95 py-0.5 px-2 rounded-md transition-all cursor-pointer text-foreground-muted hover:text-accent border border-border/60 text-[10px]"
+                title={`Reopen to ${prevStatus.replace('_', ' ')}`}
+              >
+                <ArrowLeft className="w-2.5 h-2.5" />
+                <span>Reopen</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -828,11 +1074,12 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
     <div
       id={`kanban-card-${task.id}`}
       ref={cardRef}
-      draggable={true}
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
+      draggable={canManage}
+      onDragStart={canManage ? onDragStart : undefined}
+      onDragEnd={canManage ? onDragEnd : undefined}
       className={cn(
-        'group relative overflow-hidden bg-surface-elevated/90 hover:bg-surface-elevated border border-border hover:border-accent/60 rounded-xl p-2.5 sm:p-3 transition-all duration-200 cursor-grab active:cursor-grabbing shadow-2xs',
+        'group relative overflow-hidden bg-surface-elevated/90 hover:bg-surface-elevated border border-border hover:border-accent/60 rounded-xl p-2.5 sm:p-3 transition-all duration-200 shadow-2xs',
+        canManage ? 'cursor-grab active:cursor-grabbing' : 'cursor-default',
         isDragging && 'opacity-40 scale-[1.02] shadow-2xl rotate-1 border-accent ring-2 ring-accent/40',
         pConfig.glow
       )}
@@ -861,22 +1108,39 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
           {pConfig.label}
         </span>
 
-        <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-          <GripVertical className="w-3 h-3 text-foreground-muted cursor-grab" />
-          <button
-            type="button"
-            draggable={false}
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(task.id);
-            }}
-            className="text-foreground-muted hover:text-rose-500 hover:bg-rose-500/10 p-0.5 rounded transition-colors cursor-pointer"
-            title="Delete task"
-          >
-            <Trash2 className="w-3 h-3" />
-          </button>
-        </div>
+        {canManage && (
+          <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+            <GripVertical className="w-3 h-3 text-foreground-muted cursor-grab" />
+            {onEdit && (
+              <button
+                type="button"
+                draggable={false}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(task);
+                }}
+                className="text-foreground-muted hover:text-accent hover:bg-accent/10 p-0.5 rounded transition-colors cursor-pointer"
+                title="Edit task"
+              >
+                <Pencil className="w-3 h-3" />
+              </button>
+            )}
+            <button
+              type="button"
+              draggable={false}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(task.id);
+              }}
+              className="text-foreground-muted hover:text-rose-500 hover:bg-rose-500/10 p-0.5 rounded transition-colors cursor-pointer"
+              title="Delete task"
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Title */}
@@ -895,7 +1159,7 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
       <div className="flex items-center justify-between mt-2 text-[10px] text-foreground-muted">
         <div className="flex items-center gap-1.5 min-w-0">
           {task.assignee ? (
-            <div className="flex items-center gap-1 min-w-0">
+            <div className="flex items-center gap-1.5 min-w-0">
               {task.assignee.avatarUrl ? (
                 <img
                   src={task.assignee.avatarUrl}
@@ -910,7 +1174,37 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
               <span className="truncate max-w-22.5 text-foreground-secondary text-[10px]">
                 {task.assignee.name}
               </span>
+              {isAssignedToCurrentUser && (
+                <span className="inline-flex items-center text-[9px] font-semibold text-accent bg-accent/10 px-1.5 py-0.2 rounded border border-accent/20 shrink-0">
+                  You
+                </span>
+              )}
             </div>
+          ) : onClaim ? (
+            <button
+              type="button"
+              draggable={false}
+              disabled={isClaiming}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onClaim(task.id);
+              }}
+              className={cn(
+                'inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border transition-all cursor-pointer shadow-2xs select-none',
+                isClaiming
+                  ? 'bg-accent/20 text-accent border-accent/40 cursor-wait opacity-80'
+                  : 'bg-accent/15 text-accent hover:bg-accent hover:text-white border-accent/30 active:scale-95'
+              )}
+              title="Assign this task to yourself"
+            >
+              {isClaiming ? (
+                <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+              ) : (
+                <UserPlus className="w-3 h-3 shrink-0" />
+              )}
+              <span>{isClaiming ? 'Assigning...' : 'Assign to me'}</span>
+            </button>
           ) : (
             <span className="text-foreground-muted flex items-center gap-1 text-[10px]">
               <User className="w-3 h-3" /> Unassigned
@@ -918,53 +1212,90 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
           )}
         </div>
 
-        {task.dueDate && (
-          <span className="flex items-center gap-1 text-foreground-muted font-mono text-[9px] shrink-0">
-            <Clock className="w-2.5 h-2.5 text-accent" />
-            {format(new Date(task.dueDate), 'MMM d')}
-          </span>
-        )}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {task.dueDate && (
+            <span className="flex items-center gap-1 text-foreground-muted font-mono text-[9px] shrink-0">
+              <Clock className="w-2.5 h-2.5 text-accent" />
+              {format(new Date(task.dueDate), 'MMM d')}
+            </span>
+          )}
+          {showRoomLink && task.roomId && (
+            <Link
+              href={`/rooms/${task.roomId}`}
+              draggable={false}
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-0.5 text-[9px] text-accent hover:text-accent-hover font-medium bg-accent/10 hover:bg-accent/20 px-1.5 py-0.5 rounded border border-accent/25 transition-colors shrink-0"
+              title="View in Study Room"
+            >
+              <span>Room</span>
+              <ArrowRight className="w-2.5 h-2.5" />
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* Quick Move Status Arrows for Tactile / Mobile Touch Access */}
-      <div
-        className="flex items-center justify-between mt-2 pt-1.5 border-t border-border/40 text-[10px] font-mono text-foreground-muted"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        {prevStatus ? (
-          <button
-            type="button"
-            draggable={false}
-            onClick={(e) => {
-              e.stopPropagation();
-              onMoveStatus(task.id, prevStatus);
-            }}
-            className="inline-flex items-center gap-1 bg-surface-subtle hover:bg-surface-elevated active:scale-95 py-1 px-2 rounded-md transition-all cursor-pointer text-foreground-muted hover:text-foreground border border-border/70 text-[10px]"
-            title={`Move to ${prevStatus.replace('_', ' ')}`}
-          >
-            <ArrowLeft className="w-2.5 h-2.5" />
-            <span>{prevStatus.replace('_', ' ')}</span>
-          </button>
-        ) : (
-          <div />
-        )}
+      {canManage && (prevStatus || nextStatus) && (
+        <div
+          className="flex items-center justify-between mt-2 pt-1.5 border-t border-border/40 text-[10px] font-mono text-foreground-muted"
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          {prevStatus ? (
+            <button
+              type="button"
+              draggable={false}
+              onClick={(e) => {
+                e.stopPropagation();
+                onMoveStatus(task.id, prevStatus);
+              }}
+              className="inline-flex items-center gap-1 bg-surface-subtle hover:bg-surface-elevated active:scale-95 py-1 px-2 rounded-md transition-all cursor-pointer text-foreground-muted hover:text-foreground border border-border/70 text-[10px]"
+              title={`Move to ${prevStatus.replace('_', ' ')}`}
+            >
+              <ArrowLeft className="w-2.5 h-2.5" />
+              <span>{prevStatus.replace('_', ' ')}</span>
+            </button>
+          ) : (
+            <div />
+          )}
 
-        {nextStatus && (
-          <button
-            type="button"
-            draggable={false}
-            onClick={(e) => {
-              e.stopPropagation();
-              onMoveStatus(task.id, nextStatus);
-            }}
-            className="inline-flex items-center gap-1 bg-accent/15 hover:bg-accent hover:text-white active:scale-95 py-1 px-2.5 rounded-md transition-all cursor-pointer ml-auto text-accent font-semibold border border-accent/30 text-[10px]"
-            title={`Move to ${nextStatus.replace('_', ' ')}`}
-          >
-            <span>{nextStatus.replace('_', ' ')}</span>
-            <ArrowRight className="w-2.5 h-2.5" />
-          </button>
-        )}
-      </div>
+          {onSelectFocus && (
+            <button
+              type="button"
+              draggable={false}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelectFocus(task);
+              }}
+              className={cn(
+                'inline-flex items-center gap-1 py-1 px-2 rounded-md transition-all cursor-pointer text-[10px] font-semibold border select-none active:scale-95 mx-1',
+                isActiveFocus
+                  ? 'bg-accent text-white border-accent shadow-xs'
+                  : 'bg-surface-subtle hover:bg-surface-elevated text-foreground-secondary hover:text-accent border-border/80'
+              )}
+              title={isActiveFocus ? 'Currently in focus' : 'Set as current Pomodoro focus target'}
+            >
+              <Target className="w-2.5 h-2.5" />
+              <span>{isActiveFocus ? 'Focusing' : 'Focus'}</span>
+            </button>
+          )}
+
+          {nextStatus && (
+            <button
+              type="button"
+              draggable={false}
+              onClick={(e) => {
+                e.stopPropagation();
+                onMoveStatus(task.id, nextStatus);
+              }}
+              className="inline-flex items-center gap-1 bg-accent/15 hover:bg-accent hover:text-white active:scale-95 py-1 px-2.5 rounded-md transition-all cursor-pointer ml-auto text-accent font-semibold border border-accent/30 text-[10px]"
+              title={`Move to ${nextStatus.replace('_', ' ')}`}
+            >
+              <span>{nextStatus.replace('_', ' ')}</span>
+              <ArrowRight className="w-2.5 h-2.5" />
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 };

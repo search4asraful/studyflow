@@ -10,6 +10,7 @@ import { Button } from '../ui/Button';
 import { RoomMember, TASK_PRIORITIES, TASK_STATUSES } from '@studyflow/shared';
 
 const taskFormSchema = z.object({
+  roomId: z.string().optional().nullable(),
   title: z.string().min(2, 'Title must be at least 2 characters').max(120),
   description: z.string().max(1000).optional(),
   priority: z.enum([
@@ -34,14 +35,16 @@ interface CreateTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: TaskFormData) => void;
-  members: RoomMember[];
+  members?: RoomMember[];
+  rooms?: { id: string; name: string }[];
 }
 
 export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   isOpen,
   onClose,
   onSubmit,
-  members,
+  members = [],
+  rooms,
 }) => {
   const {
     register,
@@ -51,6 +54,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   } = useForm<TaskFormData>({
     resolver: zodResolver(taskFormSchema),
     defaultValues: {
+      roomId: rooms?.[0]?.id || null,
       title: '',
       description: '',
       priority: 'MEDIUM',
@@ -78,6 +82,22 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       description="Add a task for your study group to collaborate on."
     >
       <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4 mt-2">
+        {rooms && rooms.length > 0 && (
+          <div className="space-y-1.5">
+            <label className="block text-xs font-medium text-foreground-secondary">Study Room *</label>
+            <select
+              {...register('roomId', { required: true })}
+              className="input-base bg-surface text-foreground"
+            >
+              {rooms.map((r) => (
+                <option key={r.id} value={r.id} className="bg-surface text-foreground">
+                  {r.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <Input
           label="Task Title *"
           placeholder="e.g., Review distributed systems problem set"

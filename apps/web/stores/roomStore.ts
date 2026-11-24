@@ -22,6 +22,12 @@ interface RoomState {
   updateMemberOnlineStatus: (userId: string, isOnline: boolean) => void;
   addMember: (user: SafeUser) => void;
   removeMember: (userId: string) => void;
+  updateMemberRole: (
+    targetUserId: string,
+    newRole: RoomRole,
+    newOwnerId?: string,
+    currentUserId?: string
+  ) => void;
   
   addTask: (task: Task) => void;
   updateTask: (task: Task) => void;
@@ -85,6 +91,39 @@ export const useRoomStore = create<RoomState>((set) => ({
       members: state.members.filter((m) => m.userId !== userId),
     })),
 
+  updateMemberRole: (targetUserId, newRole, newOwnerId, currentUserId) =>
+    set((state) => {
+      const updatedMembers = state.members.map((m) => {
+        if (m.userId === targetUserId) {
+          return { ...m, role: newRole };
+        }
+        if (newRole === 'OWNER' && m.role === 'OWNER' && m.userId !== targetUserId) {
+          return { ...m, role: 'MODERATOR' as RoomRole };
+        }
+        return m;
+      });
+
+      let updatedRole = state.role;
+      if (currentUserId) {
+        if (targetUserId === currentUserId) {
+          updatedRole = newRole;
+        } else if (newRole === 'OWNER' && state.role === 'OWNER') {
+          updatedRole = 'MODERATOR';
+        }
+      }
+
+      let updatedRoom = state.room;
+      if (newOwnerId && state.room) {
+        updatedRoom = { ...state.room, ownerId: newOwnerId };
+      }
+
+      return {
+        members: updatedMembers,
+        role: updatedRole,
+        room: updatedRoom,
+      };
+    }),
+
   addTask: (task) =>
     set((state) => {
       // Avoid duplicates
@@ -106,6 +145,32 @@ export const useRoomStore = create<RoomState>((set) => ({
     set((state) => {
       // Deduplicate by ID
       if (state.activities.some((a) => a.id === activity.id)) return state;
+
+      // Deduplicate near-identical recent system/task activity from same user within 5 seconds
+      const isDuplicate = state.activities.some((a) => {
+        if (
+          a.action !== 'CHAT_MESSAGE' &&
+          a.action !== 'DIRECT_CHAT' &&
+          a.userId === activity.userId
+        ) {
+          const timeDiff = Math.abs(
+            new Date(a.createdAt).getTime() - new Date(activity.createdAt).getTime()
+          );
+          if (timeDiff < 5000) {
+            if (a.details === activity.details) return true;
+            if (
+              a.details &&
+              activity.details &&
+              (a.details.includes(activity.details) || activity.details.includes(a.details))
+            ) {
+              return true;
+            }
+          }
+        }
+        return false;
+      });
+      if (isDuplicate) return state;
+
       return {
         // Append newest message to the bottom
         activities: [...state.activities.slice(-60), activity],

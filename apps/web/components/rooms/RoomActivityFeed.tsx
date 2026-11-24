@@ -119,9 +119,9 @@ export const RoomActivityFeed: React.FC<RoomActivityFeedProps> = ({
                 {/* Message Bubble */}
                 <div
                   className={cn(
-                    'max-w-[85%] px-3.5 py-2 rounded-2xl text-xs leading-relaxed break-words shadow-xs',
+                    'max-w-[85%] px-3.5 py-2 rounded-2xl text-xs leading-relaxed break-words shadow-2xs',
                     isMe
-                      ? 'bg-accent text-white rounded-tr-xs shadow-accent/20'
+                      ? 'bg-accent/20 text-foreground border border-accent/35 rounded-tr-xs shadow-2xs backdrop-blur-xs'
                       : 'bg-surface-elevated text-foreground border border-border rounded-tl-xs'
                   )}
                 >

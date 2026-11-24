@@ -278,7 +278,7 @@ export default function DashboardPage() {
                 <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">
                   Weekly Focus Velocity
                 </h3>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30">
+                <span className="text-[10px] text-nowrap hidden sm:inline-block font-mono px-2 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30">
                   Real Time
                 </span>
               </div>
@@ -286,7 +286,7 @@ export default function DashboardPage() {
             </div>
             <Link
               href="/analytics"
-              className="text-xs text-accent hover:underline flex items-center gap-1.5 font-semibold group"
+              className="text-xs text-nowrap text-accent hover:underline flex items-center gap-1.5 font-semibold group"
             >
               <span>Full Analytics</span>
               <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />

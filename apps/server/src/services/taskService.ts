@@ -1,6 +1,6 @@
 import { prisma } from '../config/prisma';
 import { CreateTaskInput, UpdateTaskInput, Task, SOCKET_EVENTS } from '../shared';
-import { ForbiddenError, NotFoundError } from '../utils/errors';
+import { ForbiddenError, NotFoundError, ConflictError } from '../utils/errors';
 import { RoomActivityService } from './activityMemory';
 import { RoomRole, TaskStatus } from '@prisma/client';
 import type { Server as SocketIOServer } from 'socket.io';
@@ -123,9 +123,20 @@ export class TaskService {
     }
 
     // Must be room member
-    const isMember = existing.room.members.some((m) => m.userId === userId);
-    if (!isMember) {
+    const userMember = existing.room.members.find((m) => m.userId === userId);
+    if (!userMember) {
       throw new ForbiddenError('You are not a member of this room');
+    }
+
+    const canManage =
+      existing.createdById === userId ||
+      userMember.role === RoomRole.OWNER ||
+      userMember.role === RoomRole.MODERATOR;
+
+    if (!canManage) {
+      throw new ForbiddenError(
+        'Only the task creator, room host, or moderator can edit or move this task'
+      );
     }
 
     const oldStatus = existing.status;
@@ -176,6 +187,14 @@ export class TaskService {
         userName: user?.name || 'Member',
         action: input.status === 'COMPLETED' ? 'TASK_COMPLETED' : 'TASK_STATUS_CHANGED',
         details: `${user?.name || 'Member'} moved "${updated.title}" to ${input.status.replace('_', ' ')}`,
+      });
+    } else if (input.title || input.description || input.priority) {
+      const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+      RoomActivityService.broadcastActivity(existing.roomId, {
+        userId,
+        userName: user?.name || 'Member',
+        action: 'TASK_UPDATED',
+        details: `${user?.name || 'Member'} updated task "${updated.title}"`,
       });
     }
 
@@ -278,5 +297,153 @@ export class TaskService {
     });
 
     return tasks.map(this.formatTask);
+  }
+
+  /**
+   * Concurrency-safe atomic task claiming.
+   * If multiple users attempt to claim an unassigned task simultaneously,
+   * PostgreSQL row-level locks and the atomic CAS (assigneeId: null) guarantee
+   * that exactly one user succeeds, while all other concurrent attempts fail cleanly.
+   */
+  static async claimTask(taskId: string, userId: string): Promise<Task> {
+    const existing = await prisma.task.findUnique({
+      where: { id: taskId },
+      include: {
+        room: { include: { members: true } },
+        assignee: { select: { id: true, name: true } },
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundError('Task not found');
+    }
+
+    const isMember = existing.room.members.some((m) => m.userId === userId);
+    if (!isMember) {
+      throw new ForbiddenError('You are not a member of this room');
+    }
+
+    // If already assigned to this user, return as-is
+    if (existing.assigneeId === userId) {
+      return this.formatTask(existing);
+    }
+
+    // Fast-fail if already assigned to someone else
+    if (existing.assigneeId && existing.assigneeId !== userId) {
+      throw new ConflictError(
+        `This task has already been claimed by ${existing.assignee?.name || 'another member'}`
+      );
+    }
+
+    // Atomic CAS Update: Only update if assigneeId is still null
+    const result = await prisma.task.updateMany({
+      where: {
+        id: taskId,
+        assigneeId: null, // Atomic concurrency guard
+      },
+      data: {
+        assigneeId: userId,
+      },
+    });
+
+    if (result.count === 0) {
+      // Another user won the race condition in the same millisecond
+      const current = await prisma.task.findUnique({
+        where: { id: taskId },
+        include: { assignee: { select: { name: true } } },
+      });
+      throw new ConflictError(
+        `This task was just claimed by ${current?.assignee?.name || 'another study mate'}`
+      );
+    }
+
+    // Fetch the fully hydrated updated task
+    const updated = await prisma.task.findUniqueOrThrow({
+      where: { id: taskId },
+      include: {
+        createdBy: {
+          select: { id: true, email: true, name: true, avatarUrl: true, bio: true, createdAt: true },
+        },
+        assignee: {
+          select: { id: true, email: true, name: true, avatarUrl: true, bio: true, createdAt: true },
+        },
+      },
+    });
+
+    const claimingUser = updated.assignee;
+    RoomActivityService.broadcastActivity(existing.roomId, {
+      userId,
+      userName: claimingUser?.name || 'Member',
+      action: 'TASK_CLAIMED',
+      details: `${claimingUser?.name || 'Member'} claimed task "${updated.title}"`,
+    });
+
+    const formatted = this.formatTask(updated);
+
+    if (this.io) {
+      this.io.to(`room:${existing.roomId}`).emit(SOCKET_EVENTS.SERVER.TASK_UPDATED, formatted);
+    }
+
+    return formatted;
+  }
+
+  /**
+   * Unassign an assigned task so other members can claim it.
+   */
+  static async unassignTask(taskId: string, userId: string): Promise<Task> {
+    const existing = await prisma.task.findUnique({
+      where: { id: taskId },
+      include: {
+        room: { include: { members: true } },
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundError('Task not found');
+    }
+
+    const userMember = existing.room.members.find((m) => m.userId === userId);
+    if (!userMember) {
+      throw new ForbiddenError('You are not a member of this room');
+    }
+
+    const canUnassign =
+      existing.assigneeId === userId ||
+      userMember.role === RoomRole.OWNER ||
+      userMember.role === RoomRole.MODERATOR ||
+      existing.createdById === userId;
+
+    if (!canUnassign) {
+      throw new ForbiddenError('Only the assignee, room host, or creator can unassign this task');
+    }
+
+    const updated = await prisma.task.update({
+      where: { id: taskId },
+      data: { assigneeId: null },
+      include: {
+        createdBy: {
+          select: { id: true, email: true, name: true, avatarUrl: true, bio: true, createdAt: true },
+        },
+        assignee: {
+          select: { id: true, email: true, name: true, avatarUrl: true, bio: true, createdAt: true },
+        },
+      },
+    });
+
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+    RoomActivityService.broadcastActivity(existing.roomId, {
+      userId,
+      userName: user?.name || 'Member',
+      action: 'TASK_UNASSIGNED',
+      details: `${user?.name || 'Member'} unassigned task "${updated.title}"`,
+    });
+
+    const formatted = this.formatTask(updated);
+
+    if (this.io) {
+      this.io.to(`room:${existing.roomId}`).emit(SOCKET_EVENTS.SERVER.TASK_UPDATED, formatted);
+    }
+
+    return formatted;
   }
 }

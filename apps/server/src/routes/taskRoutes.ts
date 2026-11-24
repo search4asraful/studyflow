@@ -12,3 +12,5 @@ taskRouter.get('/my', TaskController.getMyTasks);
 taskRouter.post('/', validateBody(createTaskSchema), TaskController.createTask);
 taskRouter.patch('/:id', validateBody(updateTaskSchema), TaskController.updateTask);
 taskRouter.delete('/:id', TaskController.deleteTask);
+taskRouter.post('/:id/claim', TaskController.claimTask);
+taskRouter.post('/:id/unassign', TaskController.unassignTask);

@@ -1,24 +1,65 @@
 'use client';
 
-import React from 'react';
-import { Task, TaskPriority, TaskStatus } from '@studyflow/shared';
+import React, { useState } from 'react';
+import { RoomRole, Task, TaskPriority, TaskStatus } from '@studyflow/shared';
 import { Badge } from '../ui/Badge';
-import { Clock, Trash2, ArrowRight, ArrowLeft, User, CheckCircle2 } from 'lucide-react';
+import { Clock, Trash2, ArrowRight, ArrowLeft, User, CheckCircle2, UserPlus, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { cn } from '../../lib/utils';
 
 interface TaskCardProps {
   task: Task;
   onUpdateStatus: (taskId: string, newStatus: TaskStatus) => void;
   onDelete: (taskId: string) => void;
-  canDelete: boolean;
+  canDelete?: boolean;
+  canEdit?: boolean;
+  canMove?: boolean;
+  onClaim?: (taskId: string) => Promise<any> | void;
+  currentUserId?: string;
+  currentUserRole?: RoomRole | string;
+  roomOwnerId?: string;
 }
 
 export const TaskCard: React.FC<TaskCardProps> = ({
   task,
   onUpdateStatus,
   onDelete,
-  canDelete,
+  canDelete = true,
+  canEdit,
+  canMove,
+  onClaim,
+  currentUserId,
+  currentUserRole,
+  roomOwnerId,
 }) => {
+  const [isClaiming, setIsClaiming] = useState(false);
+
+  const canManage = Boolean(
+    canEdit !== undefined
+      ? canEdit
+      : !currentUserId ||
+          task.createdById === currentUserId ||
+          currentUserRole === 'OWNER' ||
+          currentUserRole === 'MODERATOR' ||
+          (roomOwnerId && roomOwnerId === currentUserId)
+  );
+
+  const isAssignedToCurrentUser = Boolean(
+    currentUserId &&
+      (task.assigneeId === currentUserId || task.assignee?.id === currentUserId)
+  );
+
+  const handleClaim = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!onClaim || isClaiming) return;
+    setIsClaiming(true);
+    try {
+      await onClaim(task.id);
+    } finally {
+      setIsClaiming(false);
+    }
+  };
+
   const priorityConfig: Record<
     TaskPriority,
     { label: string; variant: 'default' | 'accent' | 'warning' | 'danger' }
@@ -54,10 +95,14 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           >
             {priorityConfig[task.priority]?.label || task.priority}
           </Badge>
-          {canDelete && (
+          {canDelete && canManage && (
             <button
-              onClick={() => onDelete(task.id)}
-              className="text-foreground-muted hover:text-red-500 hover:bg-red-500/10 p-0.5 rounded transition-colors opacity-0 group-hover:opacity-100"
+              onClick={() => {
+                if (window.confirm(`Are you sure you want to delete "${task.title}"?`)) {
+                  onDelete(task.id);
+                }
+              }}
+              className="text-foreground-muted hover:text-red-500 hover:bg-red-500/10 p-0.5 rounded transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
               title="Delete task"
             >
               <Trash2 className="w-3 h-3" />
@@ -68,13 +113,39 @@ export const TaskCard: React.FC<TaskCardProps> = ({
         <div className="flex items-center justify-between mt-1.5 text-[10px] text-foreground-muted">
           <div className="flex items-center gap-1 min-w-0">
             {task.assignee ? (
-              <span className="truncate max-w-[90px]">{task.assignee.name.split(' ')[0]}</span>
+              <div className="flex items-center gap-1 min-w-0">
+                <span className="truncate max-w-[90px]">{task.assignee.name.split(' ')[0]}</span>
+                {isAssignedToCurrentUser && (
+                  <span className="inline-flex items-center text-[9px] text-accent font-semibold ml-0.5">
+                    (You)
+                  </span>
+                )}
+              </div>
+            ) : onClaim ? (
+              <button
+                onClick={handleClaim}
+                disabled={isClaiming}
+                className={cn(
+                  'inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded border transition-all cursor-pointer font-sans shadow-2xs',
+                  isClaiming
+                    ? 'bg-accent/20 text-accent border-accent/40 cursor-wait opacity-80'
+                    : 'bg-accent/15 text-accent hover:bg-accent hover:text-white border-accent/30 active:scale-95'
+                )}
+                title="Assign to me"
+              >
+                {isClaiming ? (
+                  <Loader2 className="w-2.5 h-2.5 animate-spin shrink-0" />
+                ) : (
+                  <UserPlus className="w-2.5 h-2.5 shrink-0" />
+                )}
+                <span>{isClaiming ? 'Assigning...' : 'Assign to me'}</span>
+              </button>
             ) : (
               <span>Unassigned</span>
             )}
           </div>
 
-          {prevStatus && (
+          {canManage && prevStatus && (
             <button
               onClick={() => onUpdateStatus(task.id, prevStatus)}
               className="flex items-center gap-1 hover:text-accent hover:underline text-[10px] text-foreground-muted"
@@ -101,10 +172,14 @@ export const TaskCard: React.FC<TaskCardProps> = ({
         </Badge>
 
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          {canDelete && (
+          {canDelete && canManage && (
             <button
-              onClick={() => onDelete(task.id)}
-              className="text-foreground-muted hover:text-red-500 hover:bg-red-500/10 p-0.5 rounded transition-colors"
+              onClick={() => {
+                if (window.confirm(`Are you sure you want to delete "${task.title}"?`)) {
+                  onDelete(task.id);
+                }
+              }}
+              className="text-foreground-muted hover:text-red-500 hover:bg-red-500/10 p-0.5 rounded transition-colors cursor-pointer"
               title="Delete task"
             >
               <Trash2 className="w-3 h-3" />
@@ -141,7 +216,31 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                 </div>
               )}
               <span className="text-[10px] truncate max-w-[85px]">{task.assignee.name}</span>
+              {isAssignedToCurrentUser && (
+                <span className="inline-flex items-center text-[9px] font-semibold text-accent bg-accent/10 px-1.5 py-0.2 rounded border border-accent/20 shrink-0">
+                  You
+                </span>
+              )}
             </div>
+          ) : onClaim ? (
+            <button
+              onClick={handleClaim}
+              disabled={isClaiming}
+              className={cn(
+                'inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border transition-all cursor-pointer shadow-2xs select-none',
+                isClaiming
+                  ? 'bg-accent/20 text-accent border-accent/40 cursor-wait opacity-80'
+                  : 'bg-accent/15 text-accent hover:bg-accent hover:text-white border-accent/30 active:scale-95'
+              )}
+              title="Assign this task to yourself"
+            >
+              {isClaiming ? (
+                <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+              ) : (
+                <UserPlus className="w-3 h-3 shrink-0" />
+              )}
+              <span>{isClaiming ? 'Assigning...' : 'Assign to me'}</span>
+            </button>
           ) : (
             <span className="text-[10px] text-foreground-muted flex items-center gap-1">
               <User className="w-2.5 h-2.5" /> Unassigned
@@ -158,29 +257,31 @@ export const TaskCard: React.FC<TaskCardProps> = ({
       </div>
 
       {/* Move Buttons (Quick Status Transition) */}
-      <div className="flex items-center justify-between mt-1.5 pt-1 text-[10px] text-foreground-muted font-mono">
-        {prevStatus ? (
-          <button
-            onClick={() => onUpdateStatus(task.id, prevStatus)}
-            className="flex items-center gap-1 hover:text-accent hover:bg-surface-elevated transition-colors py-0.5 px-1.5 rounded-md text-[10px]"
-            title={`Move back to ${prevStatus}`}
-          >
-            <ArrowLeft className="w-2.5 h-2.5" />
-            <span className="capitalize">{prevStatus.replace('_', ' ').toLowerCase()}</span>
-          </button>
-        ) : <div />}
+      {canManage && (prevStatus || nextStatus) && (
+        <div className="flex items-center justify-between mt-1.5 pt-1 text-[10px] text-foreground-muted font-mono">
+          {prevStatus ? (
+            <button
+              onClick={() => onUpdateStatus(task.id, prevStatus)}
+              className="flex items-center gap-1 hover:text-accent hover:bg-surface-elevated transition-colors py-0.5 px-1.5 rounded-md text-[10px]"
+              title={`Move back to ${prevStatus}`}
+            >
+              <ArrowLeft className="w-2.5 h-2.5" />
+              <span className="capitalize">{prevStatus.replace('_', ' ').toLowerCase()}</span>
+            </button>
+          ) : <div />}
 
-        {nextStatus && (
-          <button
-            onClick={() => onUpdateStatus(task.id, nextStatus)}
-            className="flex items-center gap-1 hover:text-accent hover:bg-surface-elevated transition-colors py-0.5 px-1.5 rounded-md ml-auto text-[10px] text-accent font-semibold"
-            title={`Move to ${nextStatus}`}
-          >
-            <span className="capitalize">{nextStatus.replace('_', ' ').toLowerCase()}</span>
-            <ArrowRight className="w-2.5 h-2.5" />
-          </button>
-        )}
-      </div>
+          {nextStatus && (
+            <button
+              onClick={() => onUpdateStatus(task.id, nextStatus)}
+              className="flex items-center gap-1 hover:text-accent hover:bg-surface-elevated transition-colors py-0.5 px-1.5 rounded-md ml-auto text-[10px] text-accent font-semibold"
+              title={`Move to ${nextStatus}`}
+            >
+              <span className="capitalize">{nextStatus.replace('_', ' ').toLowerCase()}</span>
+              <ArrowRight className="w-2.5 h-2.5" />
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 };
