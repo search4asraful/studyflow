@@ -93,15 +93,15 @@ export const Navbar: React.FC<NavbarProps> = ({ variant = 'auto' }) => {
               type="button"
             >
               {/* Search Icon */}
-              <div className="flex items-center justify-center pr-2">
+              <div className="flex items-center justify-center sm:pr-2">
                 <Search className="w-3.5 h-3.5 text-accent group-hover:scale-110 transition-transform duration-150" />
               </div>
 
               {/* Vertical Border Divider */}
-              <div className="h-4 w-px bg-border group-hover:bg-accent/40 transition-colors" />
+              <div className="h-4 w-px bg-border group-hover:bg-accent/40 transition-colors hidden sm:block" />
 
               {/* Text with no background */}
-              <div className="pl-2 flex items-center font-mono text-[11px] font-medium text-foreground-secondary group-hover:text-foreground transition-colors tracking-tight select-none">
+              <div className="pl-2 hidden sm:flex items-center font-mono text-[11px] font-medium text-foreground-secondary group-hover:text-foreground transition-colors tracking-tight select-none ">
                 <span>{isMac ? '⌘' : 'Ctrl'}</span>
                 <span className="text-foreground-muted/70 mx-1 font-normal">+</span>
                 <span>K</span>

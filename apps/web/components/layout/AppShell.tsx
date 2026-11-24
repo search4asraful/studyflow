@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '../../stores/authStore';
 import { Navbar } from './Navbar';
@@ -18,19 +18,23 @@ export const AppShell: React.FC<AppShellProps> = ({ children, fullWidth = false 
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const isLoading = useAuthStore((s) => s.isLoading);
+  const isInitialized = useAuthStore((s) => s.isInitialized);
   const checkAuth = useAuthStore((s) => s.checkAuth);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     checkAuth();
   }, [checkAuth]);
 
   useEffect(() => {
-    if (!isLoading && !user) {
+    if (mounted && isInitialized && !isLoading && !user) {
       router.push('/login');
     }
-  }, [isLoading, user, router]);
+  }, [mounted, isInitialized, isLoading, user, router]);
 
-  if (isLoading) {
+  // Show loading spinner while mounting (SSR match) or verifying auth when user is not cached
+  if (!mounted || (!user && (isLoading || !isInitialized))) {
     return (
       <div className="min-h-screen bg-canvas flex flex-col items-center justify-center gap-3">
         <div className="relative">

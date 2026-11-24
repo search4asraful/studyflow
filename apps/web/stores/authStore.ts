@@ -7,6 +7,7 @@ interface AuthState {
   user: SafeUser | null;
   profile: UserProfile | null;
   isLoading: boolean;
+  isInitialized: boolean;
   isAuthenticated: boolean;
   setUser: (user: SafeUser | null, profile?: UserProfile | null) => void;
   checkAuth: () => Promise<void>;
@@ -41,12 +42,15 @@ const safeLocalStorage = {
   },
 };
 
+let checkAuthPromise: Promise<void> | null = null;
+
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       profile: null,
-      isLoading: false,
+      isLoading: true,
+      isInitialized: false,
       isAuthenticated: false,
 
       setUser: (user, profile = null) =>
@@ -55,26 +59,44 @@ export const useAuthStore = create<AuthState>()(
           profile,
           isAuthenticated: !!user,
           isLoading: false,
+          isInitialized: true,
         }),
 
       checkAuth: async () => {
-        try {
-          const data = await apiRequest<{ user: SafeUser; profile: UserProfile | null }>('/auth/me');
-          set({
-            user: data.user,
-            profile: data.profile,
-            isAuthenticated: true,
-            isLoading: false,
-          });
-        } catch {
-          // If server rejects cookie session, clear client state
-          set({
-            user: null,
-            profile: null,
-            isAuthenticated: false,
-            isLoading: false,
-          });
+        if (checkAuthPromise) {
+          return checkAuthPromise;
         }
+
+        // Only indicate loading state if we do not already have a user in memory or storage
+        if (!get().user) {
+          set({ isLoading: true });
+        }
+
+        checkAuthPromise = (async () => {
+          try {
+            const data = await apiRequest<{ user: SafeUser; profile: UserProfile | null }>('/auth/me');
+            set({
+              user: data.user,
+              profile: data.profile,
+              isAuthenticated: true,
+              isLoading: false,
+              isInitialized: true,
+            });
+          } catch {
+            // If server rejects cookie session, clear client state
+            set({
+              user: null,
+              profile: null,
+              isAuthenticated: false,
+              isLoading: false,
+              isInitialized: true,
+            });
+          } finally {
+            checkAuthPromise = null;
+          }
+        })();
+
+        return checkAuthPromise;
       },
 
       logout: async () => {
@@ -88,6 +110,7 @@ export const useAuthStore = create<AuthState>()(
             profile: null,
             isAuthenticated: false,
             isLoading: false,
+            isInitialized: true,
           });
           window.location.href = '/login';
         }
@@ -101,6 +124,15 @@ export const useAuthStore = create<AuthState>()(
         profile: state.profile,
         isAuthenticated: state.isAuthenticated,
       }),
+      merge: (persistedState: any, currentState: AuthState) => {
+        const merged = { ...currentState, ...(persistedState || {}) };
+        if (merged.user) {
+          merged.isLoading = false;
+          merged.isInitialized = true;
+          merged.isAuthenticated = true;
+        }
+        return merged;
+      },
     }
   )
 );
