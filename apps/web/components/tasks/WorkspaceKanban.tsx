@@ -19,6 +19,7 @@ import {
   User,
   UserPlus,
   X,
+  Target,
 } from 'lucide-react';
 import Link from 'next/link';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -43,6 +44,8 @@ export interface WorkspaceKanbanProps {
   className?: string;
   showRoomLink?: boolean;
   members?: RoomMember[];
+  activeTaskId?: string | null;
+  onSelectFocusTask?: (task: Task) => void;
 }
 
 // 8 Realistic Group Astro engineering workspace tasks (2 in each column)
@@ -269,6 +272,8 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
   className = '',
   showRoomLink = false,
   members = [],
+  activeTaskId,
+  onSelectFocusTask,
 }) => {
   // Use prop tasks if provided, otherwise fall back to demo tasks
   const [localTasks, setLocalTasks] = useState<Task[]>(() => {
@@ -731,6 +736,8 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
                       canManage={canUserManageTask(task)}
                       isClaiming={claimingTaskIds.has(task.id)}
                       showRoomLink={showRoomLink}
+                      isActiveFocus={activeTaskId === task.id}
+                      onSelectFocus={onSelectFocusTask}
                     />
                   ))
                 )}
@@ -808,6 +815,8 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
                       canManage={canUserManageTask(task)}
                       isClaiming={claimingTaskIds.has(task.id)}
                       showRoomLink={showRoomLink}
+                      isActiveFocus={activeTaskId === task.id}
+                      onSelectFocus={onSelectFocusTask}
                     />
                   ))
                 )}
@@ -843,6 +852,8 @@ interface KanbanTaskCardProps {
   canManage?: boolean;
   isClaiming?: boolean;
   showRoomLink?: boolean;
+  isActiveFocus?: boolean;
+  onSelectFocus?: (task: Task) => void;
 }
 
 const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
@@ -858,6 +869,8 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
   canManage = true,
   isClaiming = false,
   showRoomLink = false,
+  isActiveFocus = false,
+  onSelectFocus,
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -1243,6 +1256,27 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
             </button>
           ) : (
             <div />
+          )}
+
+          {onSelectFocus && (
+            <button
+              type="button"
+              draggable={false}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelectFocus(task);
+              }}
+              className={cn(
+                'inline-flex items-center gap-1 py-1 px-2 rounded-md transition-all cursor-pointer text-[10px] font-semibold border select-none active:scale-95 mx-1',
+                isActiveFocus
+                  ? 'bg-accent text-white border-accent shadow-xs'
+                  : 'bg-surface-subtle hover:bg-surface-elevated text-foreground-secondary hover:text-accent border-border/80'
+              )}
+              title={isActiveFocus ? 'Currently in focus' : 'Set as current Pomodoro focus target'}
+            >
+              <Target className="w-2.5 h-2.5" />
+              <span>{isActiveFocus ? 'Focusing' : 'Focus'}</span>
+            </button>
           )}
 
           {nextStatus && (

@@ -66,7 +66,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, fullWidth = false 
           <main
             className={
               fullWidth
-                ? 'flex-1 p-2 sm:p-3 md:p-3.5 pb-20 md:pb-3.5 w-full flex flex-col min-h-0 overflow-hidden'
+                ? 'flex-1 p-0 sm:p-2 md:p-3 w-full flex flex-col min-h-0 overflow-hidden'
                 : 'flex-1 p-4 sm:p-6 md:p-8 pb-20 md:pb-8 max-w-7xl mx-auto w-full overflow-x-hidden'
             }
           >
@@ -74,7 +74,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, fullWidth = false 
           </main>
         </div>
       </div>
-      <MobileNav />
+      {!fullWidth && <MobileNav />}
     </div>
   );
 };
