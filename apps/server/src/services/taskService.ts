@@ -177,6 +177,14 @@ export class TaskService {
         action: input.status === 'COMPLETED' ? 'TASK_COMPLETED' : 'TASK_STATUS_CHANGED',
         details: `${user?.name || 'Member'} moved "${updated.title}" to ${input.status.replace('_', ' ')}`,
       });
+    } else if (input.title || input.description || input.priority) {
+      const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+      RoomActivityService.broadcastActivity(existing.roomId, {
+        userId,
+        userName: user?.name || 'Member',
+        action: 'TASK_UPDATED',
+        details: `${user?.name || 'Member'} updated task "${updated.title}"`,
+      });
     }
 
     // Check if assignee changed

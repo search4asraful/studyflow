@@ -307,6 +307,16 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
             cleanText = `${act.userName} ${act.action.replace(/_/g, ' ').toLowerCase()}`;
           }
 
+          // Deduplicate identical system/task activity within 5s
+          const actTime = new Date(act.createdAt).getTime();
+          const isDuplicate = updated.some(
+            (m) =>
+              m.isSystem &&
+              m.content.trim() === cleanText.trim() &&
+              Math.abs(new Date(m.timestamp).getTime() - actTime) < 5000
+          );
+          if (isDuplicate) continue;
+
           updated.push({
             id: act.id,
             senderId: 'system',
@@ -939,7 +949,7 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
                 key={emoji}
                 type="button"
                 onClick={() => handleQuickReaction(emoji)}
-                className="w-6 h-6 rounded-lg bg-surface-subtle hover:bg-surface-elevated active:scale-90 border border-border/80 flex items-center justify-center text-xs transition-transform cursor-pointer"
+                className="w-8 h-8 rounded-lg bg-surface-subtle hover:bg-surface-elevated active:scale-90 border border-border/80 flex items-center justify-center text-xs transition-transform cursor-pointer"
                 title={`React ${emoji}`}
               >
                 {emoji}
@@ -947,7 +957,7 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
             ))}
           </div>
 
-          <span className="text-[9px] font-mono text-foreground-muted/70">
+          <span className="text-[10px] font-mono text-foreground-muted/70">
             {privateChatMember ? '1:1 Private' : '@ to mention'}
           </span>
         </div>

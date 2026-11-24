@@ -327,7 +327,7 @@ function RoomWorkspaceView({ roomId }: { roomId: string }) {
                 onUpdateTask={(taskId, updates) => updateTask(taskId, updates)}
                 onDeleteTask={(taskId) => deleteTask(taskId)}
                 onOpenCreateModal={() => setIsCreateTaskModalOpen(true)}
-                onActivityLog={handleActivityLog}
+                members={storeMembers}
               />
             </div>
           </div>

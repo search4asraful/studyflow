@@ -106,6 +106,32 @@ export const useRoomStore = create<RoomState>((set) => ({
     set((state) => {
       // Deduplicate by ID
       if (state.activities.some((a) => a.id === activity.id)) return state;
+
+      // Deduplicate near-identical recent system/task activity from same user within 5 seconds
+      const isDuplicate = state.activities.some((a) => {
+        if (
+          a.action !== 'CHAT_MESSAGE' &&
+          a.action !== 'DIRECT_CHAT' &&
+          a.userId === activity.userId
+        ) {
+          const timeDiff = Math.abs(
+            new Date(a.createdAt).getTime() - new Date(activity.createdAt).getTime()
+          );
+          if (timeDiff < 5000) {
+            if (a.details === activity.details) return true;
+            if (
+              a.details &&
+              activity.details &&
+              (a.details.includes(activity.details) || activity.details.includes(a.details))
+            ) {
+              return true;
+            }
+          }
+        }
+        return false;
+      });
+      if (isDuplicate) return state;
+
       return {
         // Append newest message to the bottom
         activities: [...state.activities.slice(-60), activity],

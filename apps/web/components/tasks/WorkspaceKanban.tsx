@@ -1,7 +1,7 @@
 'use client';
 
 import { useGSAP } from '@gsap/react';
-import { Task, TaskPriority, TaskStatus } from '@studyflow/shared';
+import { RoomMember, Task, TaskPriority, TaskStatus } from '@studyflow/shared';
 import { format } from 'date-fns';
 import gsap from 'gsap';
 import {
@@ -11,24 +11,30 @@ import {
     Clock,
     Filter,
     GripVertical,
+    Pencil,
     Plus,
     Search,
     Trash2,
     User,
 } from 'lucide-react';
+import Link from 'next/link';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { playTaskCompletionSound } from '../../lib/audio';
 import { triggerConfetti } from '../../lib/confetti';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/Button';
+import { EditTaskModal } from './EditTaskModal';
 
 export interface WorkspaceKanbanProps {
   tasks?: Task[];
   onUpdateTask?: (taskId: string, updates: Partial<Task>) => void;
   onDeleteTask?: (taskId: string) => void;
+  onEditTask?: (task: Task) => void;
   onOpenCreateModal?: () => void;
   onActivityLog?: (action: string, details?: string) => void;
   className?: string;
+  showRoomLink?: boolean;
+  members?: RoomMember[];
 }
 
 // 8 Realistic Group Astro engineering workspace tasks (2 in each column)
@@ -251,9 +257,12 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
   tasks: propTasks,
   onUpdateTask,
   onDeleteTask,
+  onEditTask,
   onOpenCreateModal,
   onActivityLog,
   className = '',
+  showRoomLink = false,
+  members = [],
 }) => {
   // Use prop tasks if provided, otherwise fall back to demo tasks
   const [localTasks, setLocalTasks] = useState<Task[]>(() => {
@@ -272,6 +281,7 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
   const [dragOverColumnId, setDragOverColumnId] = useState<TaskStatus | null>(null);
   const [activeMobileColumn, setActiveMobileColumn] = useState<TaskStatus>('TODO');
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
@@ -321,6 +331,11 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
     if (!task) return;
 
     const oldStatus = task.status;
+    // Don't trigger updates or activity if released back to original status
+    if (oldStatus === newStatus) {
+      return;
+    }
+
     const isNowCompleted = newStatus === 'COMPLETED' && oldStatus !== 'COMPLETED';
 
     setLocalTasks((prev) => {
@@ -360,15 +375,44 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
       }
     }, 20);
 
-    // Activity log notification
+    // Activity log notification - only when status changed
     if (onActivityLog) {
       const colName = KANBAN_COLUMNS.find((c) => c.id === newStatus)?.title || newStatus;
       onActivityLog('TASK_UPDATED', `Moved "${task.title}" to ${colName}`);
     }
   };
 
+  const handleSaveEditedTask = (taskId: string, updates: Partial<Task>) => {
+    const existing = localTasks.find((t) => t.id === taskId);
+    setLocalTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t))
+    );
+
+    if (onUpdateTask) {
+      onUpdateTask(taskId, updates);
+    }
+
+    if (onActivityLog && existing) {
+      if (updates.status && updates.status !== existing.status) {
+        const colName = KANBAN_COLUMNS.find((c) => c.id === updates.status)?.title || updates.status;
+        onActivityLog('TASK_UPDATED', `Moved "${updates.title || existing.title}" to ${colName}`);
+      } else {
+        onActivityLog('TASK_UPDATED', `Updated task "${updates.title || existing.title}"`);
+      }
+    }
+
+    if (onEditTask && existing) {
+      onEditTask({ ...existing, ...updates });
+    }
+
+    setEditingTask(null);
+  };
+
   const handleDeleteTask = (taskId: string) => {
     const task = localTasks.find((t) => t.id === taskId);
+    if (!confirm(`Are you sure you want to delete "${task?.title || 'this task'}"?`)) {
+      return;
+    }
     setLocalTasks((prev) => prev.filter((t) => t.id !== taskId));
     if (onDeleteTask) {
       onDeleteTask(taskId);
@@ -451,17 +495,17 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
           </div>
 
           {/* Add Room Task CTA Button */}
-          <Button
-            onClick={() => {
-              if (onOpenCreateModal) onOpenCreateModal();
-            }}
-            size="sm"
-            className="h-8 px-2.5 sm:px-3 btn-primary bg-accent hover:bg-accent-hover active:scale-95 text-white shadow-xs rounded-lg font-semibold text-xs gap-1.5 whitespace-nowrap cursor-pointer transition-all shrink-0"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span className="hidden xs:inline">Add Task</span>
-            <span className="xs:hidden">Task</span>
-          </Button>
+          {onOpenCreateModal && (
+            <Button
+              onClick={onOpenCreateModal}
+              size="sm"
+              className="h-8 px-2.5 sm:px-3 btn-primary bg-accent hover:bg-accent-hover active:scale-95 text-white shadow-xs rounded-lg font-semibold text-xs gap-1.5 whitespace-nowrap cursor-pointer transition-all shrink-0"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span className="hidden xs:inline">Add Task</span>
+              <span className="xs:hidden">Task</span>
+            </Button>
+          )}
         </div>
 
         {/* Overall Task Progress Strip */}
@@ -592,6 +636,8 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
                       onDragEnd={handleDragEnd}
                       onMoveStatus={handleMoveTaskStatus}
                       onDelete={handleDeleteTask}
+                      onEdit={(t) => setEditingTask(t)}
+                      showRoomLink={showRoomLink}
                     />
                   ))
                 )}
@@ -663,6 +709,8 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
                       onDragEnd={handleDragEnd}
                       onMoveStatus={handleMoveTaskStatus}
                       onDelete={handleDeleteTask}
+                      onEdit={(t) => setEditingTask(t)}
+                      showRoomLink={showRoomLink}
                     />
                   ))
                 )}
@@ -671,6 +719,15 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
           );
         })}
       </div>
+
+      {/* Modal for Editing Tasks */}
+      <EditTaskModal
+        isOpen={!!editingTask}
+        onClose={() => setEditingTask(null)}
+        onSubmit={handleSaveEditedTask}
+        task={editingTask}
+        members={members}
+      />
     </div>
   );
 };
@@ -683,6 +740,8 @@ interface KanbanTaskCardProps {
   onDragEnd: (e: React.DragEvent<HTMLDivElement>) => void;
   onMoveStatus: (taskId: string, newStatus: TaskStatus) => void;
   onDelete: (taskId: string) => void;
+  onEdit?: (task: Task) => void;
+  showRoomLink?: boolean;
 }
 
 const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
@@ -692,6 +751,8 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
   onDragEnd,
   onMoveStatus,
   onDelete,
+  onEdit,
+  showRoomLink = false,
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -762,6 +823,21 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
             {pConfig.label}
           </span>
           <div className="flex items-center gap-1 opacity-80 sm:opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+            {onEdit && (
+              <button
+                type="button"
+                draggable={false}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(task);
+                }}
+                className="text-foreground-muted hover:text-accent hover:bg-accent/10 p-0.5 rounded transition-colors cursor-pointer"
+                title="Edit task"
+              >
+                <Pencil className="w-3 h-3" />
+              </button>
+            )}
             <button
               type="button"
               draggable={false}
@@ -803,21 +879,35 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
             )}
           </div>
 
-          {prevStatus && (
-            <button
-              type="button"
-              draggable={false}
-              onClick={(e) => {
-                e.stopPropagation();
-                onMoveStatus(task.id, prevStatus);
-              }}
-              className="inline-flex items-center gap-1 bg-surface-subtle hover:bg-surface-elevated active:scale-95 py-0.5 px-2 rounded-md transition-all cursor-pointer text-foreground-muted hover:text-accent border border-border/60 text-[10px]"
-              title={`Reopen to ${prevStatus.replace('_', ' ')}`}
-            >
-              <ArrowLeft className="w-2.5 h-2.5" />
-              <span>Reopen</span>
-            </button>
-          )}
+          <div className="flex items-center gap-1.5">
+            {showRoomLink && task.roomId && (
+              <Link
+                href={`/rooms/${task.roomId}`}
+                draggable={false}
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-0.5 text-[9px] text-accent hover:text-accent-hover font-medium bg-accent/10 hover:bg-accent/20 px-1.5 py-0.5 rounded border border-accent/25 transition-colors shrink-0"
+                title="View in Study Room"
+              >
+                <span>Room</span>
+                <ArrowRight className="w-2.5 h-2.5" />
+              </Link>
+            )}
+            {prevStatus && (
+              <button
+                type="button"
+                draggable={false}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onMoveStatus(task.id, prevStatus);
+                }}
+                className="inline-flex items-center gap-1 bg-surface-subtle hover:bg-surface-elevated active:scale-95 py-0.5 px-2 rounded-md transition-all cursor-pointer text-foreground-muted hover:text-accent border border-border/60 text-[10px]"
+                title={`Reopen to ${prevStatus.replace('_', ' ')}`}
+              >
+                <ArrowLeft className="w-2.5 h-2.5" />
+                <span>Reopen</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -863,6 +953,21 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
 
         <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
           <GripVertical className="w-3 h-3 text-foreground-muted cursor-grab" />
+          {onEdit && (
+            <button
+              type="button"
+              draggable={false}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(task);
+              }}
+              className="text-foreground-muted hover:text-accent hover:bg-accent/10 p-0.5 rounded transition-colors cursor-pointer"
+              title="Edit task"
+            >
+              <Pencil className="w-3 h-3" />
+            </button>
+          )}
           <button
             type="button"
             draggable={false}
@@ -918,12 +1023,26 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
           )}
         </div>
 
-        {task.dueDate && (
-          <span className="flex items-center gap-1 text-foreground-muted font-mono text-[9px] shrink-0">
-            <Clock className="w-2.5 h-2.5 text-accent" />
-            {format(new Date(task.dueDate), 'MMM d')}
-          </span>
-        )}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {task.dueDate && (
+            <span className="flex items-center gap-1 text-foreground-muted font-mono text-[9px] shrink-0">
+              <Clock className="w-2.5 h-2.5 text-accent" />
+              {format(new Date(task.dueDate), 'MMM d')}
+            </span>
+          )}
+          {showRoomLink && task.roomId && (
+            <Link
+              href={`/rooms/${task.roomId}`}
+              draggable={false}
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-0.5 text-[9px] text-accent hover:text-accent-hover font-medium bg-accent/10 hover:bg-accent/20 px-1.5 py-0.5 rounded border border-accent/25 transition-colors shrink-0"
+              title="View in Study Room"
+            >
+              <span>Room</span>
+              <ArrowRight className="w-2.5 h-2.5" />
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* Quick Move Status Arrows for Tactile / Mobile Touch Access */}
