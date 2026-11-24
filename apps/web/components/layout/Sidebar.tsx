@@ -93,9 +93,6 @@ export const Sidebar: React.FC = () => {
               <Sparkles className="w-3.5 h-3.5 text-accent" />
               <span>StudyFlow Workspace</span>
             </div>
-            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-sm bg-accent/15 text-accent border border-accent/30 font-semibold">
-              v1.2
-            </span>
           </div>
           <p className="text-[11px] text-foreground-muted leading-relaxed">
             Real-time synchronized Pomodoro with sub-50ms latency.

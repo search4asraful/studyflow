@@ -759,7 +759,7 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
                 <p className="text-[11px] font-semibold text-foreground truncate">
                   {incomingDirectAlert.senderName}
                 </p>
-                <p className="text-[10px] text-foreground-muted truncate max-w-[170px]">
+                <p className="text-[10px] text-foreground-muted truncate max-w-42.5">
                   {incomingDirectAlert.content}
                 </p>
               </div>
@@ -808,7 +808,7 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
                 <p className="text-xs font-medium text-foreground-secondary">
                   No other members yet
                 </p>
-                <p className="text-[11px] text-foreground-muted max-w-[190px]">
+                <p className="text-[11px] text-foreground-muted max-w-47.5">
                   Share the room code to invite peers to your Pomodoro session.
                 </p>
               </div>
@@ -994,7 +994,7 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
             )}
 
             {/* Current User Card */}
-            <div className="pt-2 mt-2 border-t border-border/50">
+            <div className="mt-2">
               <div className="flex items-center justify-between p-2 rounded-xl bg-surface-subtle/80 border border-border/60">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="relative shrink-0">
@@ -1050,14 +1050,14 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
             className="flex-1 overflow-y-auto px-3 py-2 space-y-2 min-h-0"
           >
             {activeMessages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full min-h-[140px] text-center text-foreground-muted space-y-1.5 py-8">
+              <div className="flex flex-col items-center justify-center h-full min-h-35 text-center text-foreground-muted space-y-1.5 py-8">
                 <MessageSquare className="w-6 h-6 text-accent/60" />
                 <p className="text-xs font-medium text-foreground-secondary">
                   {privateChatMember
                     ? `Direct chat with ${privateChatMember.name}`
                     : 'No messages yet'}
                 </p>
-                <p className="text-[11px] text-foreground-muted max-w-[200px]">
+                <p className="text-[11px] text-foreground-muted max-w-50">
                   Send a live note, reaction, or mention someone with @
                 </p>
               </div>
@@ -1107,7 +1107,7 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
 
                     <div
                       className={cn(
-                        'rounded-2xl px-3.5 py-1.5 text-xs leading-relaxed shadow-2xs transition-all break-words',
+                        'rounded-2xl px-3.5 py-1.5 text-xs leading-relaxed shadow-2xs transition-all wrap-break-word',
                         isMe
                           ? 'bg-accent/20 text-foreground border border-accent/35 rounded-tr-xs shadow-2xs backdrop-blur-xs'
                           : 'bg-surface-subtle text-foreground rounded-tl-xs border border-border/60'

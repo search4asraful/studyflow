@@ -271,7 +271,7 @@ function RoomWorkspaceView({ roomId }: { roomId: string }) {
             </Link>
 
             <div className="flex items-center gap-2 min-w-0">
-              <h1 className="text-xs sm:text-sm font-semibold text-foreground tracking-tight truncate max-w-[140px] xs:max-w-[200px] sm:max-w-xs md:max-w-md">
+              <h1 className="text-xs sm:text-sm font-semibold text-foreground tracking-tight truncate max-w-35 xs:max-w-[200px] sm:max-w-xs md:max-w-md">
                 {room.name}
               </h1>
 
@@ -690,7 +690,7 @@ function RoomWorkspaceView({ roomId }: { roomId: string }) {
                                 )}
                                 title={isCompleted ? 'Mark incomplete' : 'Mark complete'}
                               >
-                                <Check className="w-3 h-3 stroke-[3]" />
+                                <Check className="w-3 h-3 stroke-3" />
                               </button>
 
                               <span
@@ -722,7 +722,7 @@ function RoomWorkspaceView({ roomId }: { roomId: string }) {
                               {task.assignee ? (
                                 <span className="text-[10px] font-mono text-foreground-muted hidden sm:inline-flex items-center gap-1 bg-surface-subtle px-1.5 py-0.5 rounded border border-border/60">
                                   <User className="w-2.5 h-2.5 text-accent" />
-                                  <span className="truncate max-w-[70px]">{task.assignee.name}</span>
+                                  <span className="truncate max-w-17.5">{task.assignee.name}</span>
                                 </span>
                               ) : (
                                 <button
