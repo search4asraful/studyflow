@@ -15,6 +15,8 @@ export const errorHandler = (
     });
   }
 
+  console.error('[Unhandled Server Error]:', err);
+
   // Do not expose unhandled database errors or stacks to clients
   return res.status(500).json({
     success: false,

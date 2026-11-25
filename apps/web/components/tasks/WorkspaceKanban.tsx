@@ -46,6 +46,7 @@ export interface WorkspaceKanbanProps {
   members?: RoomMember[];
   activeTaskId?: string | null;
   onSelectFocusTask?: (task: Task) => void;
+  showDelete?: boolean;
 }
 
 // 8 Realistic Group Astro engineering workspace tasks (2 in each column)
@@ -274,6 +275,7 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
   members = [],
   activeTaskId,
   onSelectFocusTask,
+  showDelete = true,
 }) => {
   // Use prop tasks if provided, otherwise fall back to demo tasks
   const [localTasks, setLocalTasks] = useState<Task[]>(() => {
@@ -777,7 +779,7 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
                       onDragStart={(e) => handleDragStart(e, task.id)}
                       onDragEnd={handleDragEnd}
                       onMoveStatus={handleMoveTaskStatus}
-                      onDelete={handleDeleteTask}
+                      onDelete={showDelete && onDeleteTask ? handleDeleteTask : undefined}
                       onEdit={(t) => setEditingTask(t)}
                       onClaim={handleClaimTask}
                       currentUserId={currentUserId}
@@ -856,7 +858,7 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
                       onDragStart={(e) => handleDragStart(e, task.id)}
                       onDragEnd={handleDragEnd}
                       onMoveStatus={handleMoveTaskStatus}
-                      onDelete={handleDeleteTask}
+                      onDelete={showDelete && onDeleteTask ? handleDeleteTask : undefined}
                       onEdit={(t) => setEditingTask(t)}
                       onClaim={handleClaimTask}
                       currentUserId={currentUserId}
@@ -893,7 +895,7 @@ interface KanbanTaskCardProps {
   onDragStart: (e: React.DragEvent<HTMLDivElement>) => void;
   onDragEnd: (e: React.DragEvent<HTMLDivElement>) => void;
   onMoveStatus: (taskId: string, newStatus: TaskStatus) => void;
-  onDelete: (taskId: string) => void;
+  onDelete?: (taskId: string) => void;
   onEdit?: (task: Task) => void;
   onClaim?: (taskId: string) => Promise<any> | void;
   currentUserId?: string;
@@ -1011,19 +1013,21 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
                   <Pencil className="w-3 h-3" />
                 </button>
               )}
-              <button
-                type="button"
-                draggable={false}
-                onMouseDown={(e) => e.stopPropagation()}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(task.id);
-                }}
-                className="text-foreground-muted hover:text-rose-500 hover:bg-rose-500/10 p-0.5 rounded transition-colors cursor-pointer"
-                title="Delete task"
-              >
-                <Trash2 className="w-3 h-3" />
-              </button>
+              {onDelete && (
+                <button
+                  type="button"
+                  draggable={false}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(task.id);
+                  }}
+                  className="text-foreground-muted hover:text-rose-500 hover:bg-rose-500/10 p-0.5 rounded transition-colors cursor-pointer"
+                  title="Delete task"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -1174,19 +1178,21 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
                 <Pencil className="w-3 h-3" />
               </button>
             )}
-            <button
-              type="button"
-              draggable={false}
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete(task.id);
-              }}
-              className="text-foreground-muted hover:text-rose-500 hover:bg-rose-500/10 p-0.5 rounded transition-colors cursor-pointer"
-              title="Delete task"
-            >
-              <Trash2 className="w-3 h-3" />
-            </button>
+            {onDelete && (
+              <button
+                type="button"
+                draggable={false}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(task.id);
+                }}
+                className="text-foreground-muted hover:text-rose-500 hover:bg-rose-500/10 p-0.5 rounded transition-colors cursor-pointer"
+                title="Delete task"
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            )}
           </div>
         )}
       </div>

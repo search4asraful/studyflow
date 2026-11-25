@@ -44,10 +44,11 @@ import {
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { cn, formatTimeRemaining } from '../../../lib/utils';
-import { apiRequest } from '../../../lib/api';
+import { apiRequest, invalidateApiCache } from '../../../lib/api';
+import { getSocket } from '../../../lib/socket';
 import { playTaskCompletionSound } from '../../../lib/audio';
 import { triggerConfetti } from '../../../lib/confetti';
-import { Task, TaskPriority, TaskStatus } from '@studyflow/shared';
+import { Task, TaskPriority, TaskStatus, SOCKET_EVENTS } from '@studyflow/shared';
 
 function RoomWorkspaceView({ roomId }: { roomId: string }) {
   const router = useRouter();
@@ -154,6 +155,7 @@ function RoomWorkspaceView({ roomId }: { roomId: string }) {
     claimTask,
     sendChatMessage,
     updateMemberRole,
+    leaveRoom,
   } = useRoomSocket(roomId);
 
   const handleCopyInviteCode = () => {
@@ -165,6 +167,8 @@ function RoomWorkspaceView({ roomId }: { roomId: string }) {
   };
 
   const handleLeaveOrDeleteRoom = async () => {
+    if (isLeaving) return;
+
     if (isOwner) {
       const confirmDelete = window.confirm(
         'Are you sure you want to delete this study room? This will permanently end the session for all participants.'
@@ -173,10 +177,15 @@ function RoomWorkspaceView({ roomId }: { roomId: string }) {
 
       try {
         setIsLeaving(true);
+        const socket = getSocket();
+        if (socket.connected) {
+          socket.emit(SOCKET_EVENTS.CLIENT.ROOM_LEAVE, { roomId });
+        }
         await apiRequest(`/rooms/${roomId}`, { method: 'DELETE' });
         toast.success('Study room deleted');
+        invalidateApiCache('/rooms');
         useRoomStore.getState().clearRoom();
-        router.push('/rooms');
+        router.replace('/rooms');
       } catch (err: any) {
         toast.error(err.message || 'Failed to delete room');
         setIsLeaving(false);
@@ -187,10 +196,11 @@ function RoomWorkspaceView({ roomId }: { roomId: string }) {
 
       try {
         setIsLeaving(true);
-        await apiRequest(`/rooms/${roomId}/leave`, { method: 'POST' });
+        await leaveRoom();
         toast.success('You left the study room');
+        invalidateApiCache('/rooms');
         useRoomStore.getState().clearRoom();
-        router.push('/rooms');
+        router.replace('/rooms');
       } catch (err: any) {
         toast.error(err.message || 'Failed to leave room');
         setIsLeaving(false);
@@ -226,6 +236,42 @@ function RoomWorkspaceView({ roomId }: { roomId: string }) {
     triggerConfetti({ particleCount: 70 });
     toast.success('Focus target completed! Great work!');
     setActiveTaskId(null);
+  };
+
+  const canUserManageTask = (task: Task): boolean => {
+    if (!user?.id) return true;
+    if (task.createdById === user.id) return true;
+    if (role === 'OWNER' || room.ownerId === user.id) return true;
+    if (role === 'MODERATOR') return true;
+    const userMember = storeMembers.find((m) => m.userId === user.id);
+    if (userMember?.role === 'OWNER' || userMember?.role === 'MODERATOR') return true;
+    return false;
+  };
+
+  const handleDeleteTask = (task: Task) => {
+    if (!canUserManageTask(task)) {
+      toast.error('Only the task creator, room host, or moderator can delete this task');
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to delete "${task.title}"?`)) {
+      return;
+    }
+
+    if (activeTaskId === task.id) {
+      setActiveTaskId(null);
+    }
+
+    deleteTask(task.id);
+    toast.success(`Task "${task.title}" deleted`);
+  };
+
+  const handleEditTask = (task: Task) => {
+    if (!canUserManageTask(task)) {
+      toast.error('Only the task creator, room host, or moderator can edit this task');
+      return;
+    }
+    setEditingTask(task);
   };
 
   // Filtered task items for the minimalist task list
@@ -494,7 +540,10 @@ function RoomWorkspaceView({ roomId }: { roomId: string }) {
                 <WorkspaceKanban
                   tasks={storeTasks}
                   onUpdateTask={(taskId, updates) => updateTask(taskId, updates)}
-                  onDeleteTask={(taskId) => deleteTask(taskId)}
+                  onDeleteTask={(taskId) => {
+                    if (activeTaskId === taskId) setActiveTaskId(null);
+                    deleteTask(taskId);
+                  }}
                   onClaimTask={(taskId) => claimTask(taskId)}
                   currentUserId={user?.id}
                   currentUserRole={role}
@@ -526,7 +575,10 @@ function RoomWorkspaceView({ roomId }: { roomId: string }) {
                   <WorkspaceKanban
                     tasks={storeTasks}
                     onUpdateTask={(taskId, updates) => updateTask(taskId, updates)}
-                    onDeleteTask={(taskId) => deleteTask(taskId)}
+                    onDeleteTask={(taskId) => {
+                      if (activeTaskId === taskId) setActiveTaskId(null);
+                      deleteTask(taskId);
+                    }}
                     onClaimTask={(taskId) => claimTask(taskId)}
                     currentUserId={user?.id}
                     currentUserRole={role}
@@ -750,7 +802,7 @@ function RoomWorkspaceView({ roomId }: { roomId: string }) {
                               <div className="flex items-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
                                 <button
                                   type="button"
-                                  onClick={() => setEditingTask(task)}
+                                  onClick={() => handleEditTask(task)}
                                   className="p-1 rounded text-foreground-muted hover:text-accent hover:bg-surface-subtle transition-colors cursor-pointer"
                                   title="Edit task"
                                 >
@@ -758,7 +810,7 @@ function RoomWorkspaceView({ roomId }: { roomId: string }) {
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => deleteTask(task.id)}
+                                  onClick={() => handleDeleteTask(task)}
                                   className="p-1 rounded text-foreground-muted hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
                                   title="Delete task"
                                 >

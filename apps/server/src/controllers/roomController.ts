@@ -71,9 +71,14 @@ export class RoomController {
     }
   }
 
+  private static async resolveRoomId(idOrCode: string): Promise<string> {
+    const room = await RoomService.findRoomByIdOrCode(idOrCode);
+    return room ? room.id : idOrCode;
+  }
+
   static async getTimerState(req: Request, res: Response, next: NextFunction) {
     try {
-      const id = req.params.id as string;
+      const id = await RoomController.resolveRoomId(req.params.id as string);
       const timerState = await TimerService.getAuthoritativeState(id);
       res.status(200).json({ success: true, data: timerState });
     } catch (error) {
@@ -83,7 +88,7 @@ export class RoomController {
 
   static async startTimer(req: Request, res: Response, next: NextFunction) {
     try {
-      const id = req.params.id as string;
+      const id = await RoomController.resolveRoomId(req.params.id as string);
       const timerState = await TimerService.startTimer(id, req.user!.id);
       res.status(200).json({ success: true, data: timerState });
     } catch (error) {
@@ -93,7 +98,7 @@ export class RoomController {
 
   static async pauseTimer(req: Request, res: Response, next: NextFunction) {
     try {
-      const id = req.params.id as string;
+      const id = await RoomController.resolveRoomId(req.params.id as string);
       const timerState = await TimerService.pauseTimer(id, req.user!.id);
       res.status(200).json({ success: true, data: timerState });
     } catch (error) {
@@ -103,7 +108,7 @@ export class RoomController {
 
   static async resumeTimer(req: Request, res: Response, next: NextFunction) {
     try {
-      const id = req.params.id as string;
+      const id = await RoomController.resolveRoomId(req.params.id as string);
       const timerState = await TimerService.resumeTimer(id, req.user!.id);
       res.status(200).json({ success: true, data: timerState });
     } catch (error) {
@@ -113,7 +118,7 @@ export class RoomController {
 
   static async skipPhase(req: Request, res: Response, next: NextFunction) {
     try {
-      const id = req.params.id as string;
+      const id = await RoomController.resolveRoomId(req.params.id as string);
       const { targetPhase } = req.body;
       const timerState = await TimerService.skipPhase(id, req.user!.id, targetPhase);
       res.status(200).json({ success: true, data: timerState });

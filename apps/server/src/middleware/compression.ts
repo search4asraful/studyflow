@@ -19,12 +19,15 @@ export function nativeCompression(req: Request, res: Response, next: NextFunctio
     }
 
     let buffer: Buffer;
+    let serializedBody: string | Buffer = body;
+
     if (typeof body === 'string') {
       buffer = Buffer.from(body, 'utf-8');
     } else if (Buffer.isBuffer(body)) {
       buffer = body;
     } else {
-      buffer = Buffer.from(JSON.stringify(body), 'utf-8');
+      serializedBody = JSON.stringify(body);
+      buffer = Buffer.from(serializedBody, 'utf-8');
       if (!res.getHeader('Content-Type')) {
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
       }
@@ -32,12 +35,12 @@ export function nativeCompression(req: Request, res: Response, next: NextFunctio
 
     // Skip compression for small payloads (< 512 bytes) where compression overhead outweighs benefits
     if (buffer.length < 512) {
-      return originalSend(body);
+      return originalSend(serializedBody);
     }
 
     if (/\bgzip\b/.test(acceptEncoding)) {
       zlib.gzip(buffer, { level: 6 }, (err, compressed) => {
-        if (err) return originalSend(buffer);
+        if (err) return originalSend(serializedBody);
         res.setHeader('Content-Encoding', 'gzip');
         res.setHeader('Vary', 'Accept-Encoding');
         res.removeHeader('Content-Length');
@@ -46,7 +49,7 @@ export function nativeCompression(req: Request, res: Response, next: NextFunctio
       return res;
     } else if (/\bdeflate\b/.test(acceptEncoding)) {
       zlib.deflate(buffer, { level: 6 }, (err, compressed) => {
-        if (err) return originalSend(buffer);
+        if (err) return originalSend(serializedBody);
         res.setHeader('Content-Encoding', 'deflate');
         res.setHeader('Vary', 'Accept-Encoding');
         res.removeHeader('Content-Length');
@@ -55,14 +58,7 @@ export function nativeCompression(req: Request, res: Response, next: NextFunctio
       return res;
     }
 
-    return originalSend(body);
-  };
-
-  res.json = (body: any): Response => {
-    if (!res.getHeader('Content-Type')) {
-      res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    }
-    return res.send(body);
+    return originalSend(serializedBody);
   };
 
   next();
