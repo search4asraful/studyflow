@@ -89,9 +89,11 @@ export default function LoginPage() {
         </div>
 
         <Link href="/" className="flex items-center gap-2.5 mb-8 group relative z-10">
-          <div className="w-10 h-10 rounded-2xl bg-linear-to-tr from-accent via-blue-500 to-sky-400 text-white flex items-center justify-center font-bold text-base shadow-lg shadow-accent/25 group-hover:scale-105 transition-all">
-            SF
-          </div>
+          <img
+            src="/studyflow.png"
+            alt="StudyFlow Logo"
+            className="w-12 h-12 rounded-2xl object-contain group-hover:scale-105 transition-transform"
+          />
           <span className="font-bold text-2xl tracking-tight text-foreground">StudyFlow</span>
         </Link>
 

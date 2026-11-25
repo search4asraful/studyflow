@@ -236,7 +236,7 @@ export const OnlineActivityStatus: React.FC = () => {
             className={cn(
               'font-mono text-[10px] px-1.5 py-0.5 rounded-full border flex items-center gap-1',
               latency < 60
-                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+                ? 'bg-emerald-500/15 border-emerald-500/30 dark:text-emerald-300 text-emerald-600'
                 : latency < 150
                 ? 'bg-blue-500/15 border-blue-500/30 text-blue-300'
                 : 'bg-amber-500/15 border-amber-500/30 text-amber-300'

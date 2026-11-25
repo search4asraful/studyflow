@@ -7,6 +7,11 @@ export const metadata: Metadata = {
   title: 'StudyFlow — Collaborative Digital Study Environment',
   description:
     'Real-time collaborative study platform with authoritative synchronized Pomodoro timers, shared task boards, and productivity analytics.',
+  icons: {
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
+    apple: '/studyflow.png',
+  },
 };
 
 export default function RootLayout({

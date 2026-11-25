@@ -25,7 +25,7 @@ export const SingleTabGuard: React.FC = () => {
       role="dialog"
       aria-modal="true"
       aria-label="Another tab is active"
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-canvas/85 backdrop-blur-md p-4 animate-in fade-in duration-200"
+      className="fixed inset-0 z-9999 flex items-center justify-center bg-canvas/85 backdrop-blur-md p-4 animate-in fade-in duration-200"
     >
       <div className="card-glass max-w-md w-full p-6 sm:p-8 space-y-6 text-center border-accent/40 shadow-2xl relative overflow-hidden">
         {/* Subtle decorative glow */}
@@ -48,7 +48,7 @@ export const SingleTabGuard: React.FC = () => {
           </h2>
           <p className="text-xs text-foreground-secondary leading-relaxed">
             To prevent desynchronized Pomodoro timers, drop duplicate WebSocket connections,
-            and conserve server memory (<span className="font-mono text-accent">100MB</span> RAM budget), only one active tab can control your session at a time.
+            and conserve server memory, only one active tab can control your session at a time.
           </p>
         </div>
 

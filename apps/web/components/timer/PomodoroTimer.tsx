@@ -442,9 +442,11 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({
             {/* Zen Header */}
             <div className="flex items-center justify-between w-full max-w-4xl">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-accent text-white flex items-center justify-center font-bold text-xs shadow-md">
-                  SF
-                </div>
+                <img
+                  src="/studyflow.png"
+                  alt="StudyFlow Logo"
+                  className="w-10 h-10 rounded-xl object-contain"
+                />
                 <div>
                   <h2 className="text-sm font-bold text-white tracking-tight">
                     {room?.name || 'Study Room'}

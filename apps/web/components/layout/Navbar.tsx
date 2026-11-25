@@ -77,9 +77,11 @@ export const Navbar: React.FC<NavbarProps> = ({ variant = 'auto' }) => {
               className="flex items-center gap-2.5 group select-none"
               title={isAdminPanel ? 'StudyFlow Dashboard' : 'StudyFlow Home'}
             >
-              <div className="w-8 h-8 rounded-xl bg-linear-to-tr from-accent via-blue-500 to-sky-400 text-white flex items-center justify-center font-bold text-sm tracking-tight shadow-md shadow-accent/20 group-hover:scale-105 group-hover:shadow-accent/40 transition-all duration-200">
-                SF
-              </div>
+              <img
+                src="/studyflow.png"
+                alt="StudyFlow Logo"
+                className="w-10 h-10 rounded-xl object-contain group-hover:scale-105 transition-transform duration-200"
+              />
               <span className="font-extrabold text-base tracking-tight text-foreground">
                 StudyFlow
               </span>

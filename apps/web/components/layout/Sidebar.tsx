@@ -110,7 +110,7 @@ export const Sidebar: React.FC = () => {
       </div>
 
       {/* Bottom Section: Activity Status & Sign Out */}
-      <div className="space-y-3 pt-3 border-t border-border/80">
+      <div className="space-y-3 pt-3">
         {/* Dynamic Online Activity & Peer Reachability Card */}
         <OnlineActivityStatus />
 
