@@ -656,7 +656,7 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
               className="p-1 -ml-1 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-subtle transition-colors cursor-pointer"
               title="Back to Room Chat"
             >
-              <ArrowLeft className="w-3.5 h-3.5" />
+              <ArrowLeft className="w-4 h-4" />
             </button>
 
             <div className="relative shrink-0">
@@ -664,10 +664,10 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
                 <img
                   src={privateChatMember.avatarUrl}
                   alt={privateChatMember.name}
-                  className="w-5 h-5 rounded-full object-cover border border-border"
+                  className="w-6 h-6 rounded-full object-cover border border-border"
                 />
               ) : (
-                <div className="w-5 h-5 rounded-full bg-accent/20 border border-accent/40 flex items-center justify-center text-[10px] text-accent font-bold">
+                <div className="w-6 h-6 rounded-full bg-accent/20 border border-accent/40 flex items-center justify-center text-sm text-accent font-bold">
                   {privateChatMember.name.charAt(0)}
                 </div>
               )}
@@ -675,11 +675,11 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
             </div>
 
             <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-xs font-semibold text-foreground truncate">
+              <span className="text-sm font-semibold text-foreground truncate">
                 {privateChatMember.name}
               </span>
-              <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-accent/15 border border-accent/30 text-accent font-medium flex items-center gap-0.5 shrink-0">
-                <Lock className="w-2 h-2" />
+              <span className="text-[9px] font-mono px-1.5 py-0.7 rounded-full bg-accent/15 border border-accent/30 text-accent font-medium flex items-center gap-0.5 shrink-0">
+                <Lock className="w-3 h-3" />
                 1:1
               </span>
             </div>
@@ -714,7 +714,7 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
                   +{unreadRoomCount}
                 </span>
               ) : chatMessagesCount > 0 ? (
-                <span className="text-[10px] font-mono text-foreground-muted">
+                <span className="text-xs font-mono text-foreground-muted">
                   ({chatMessagesCount})
                 </span>
               ) : null}
@@ -732,7 +732,7 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
             >
               <Users className="w-3.5 h-3.5 text-accent" />
               <span>Members</span>
-              <span className="text-[10px] font-mono text-foreground-muted">
+              <span className="text-xs font-mono text-foreground-muted">
                 ({activeMembers.length + 1})
               </span>
               {totalUnreadDirect > 0 && (
@@ -756,10 +756,10 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-accent" />
               </span>
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold text-foreground truncate">
+                <p className="text-sm font-semibold text-foreground truncate">
                   {incomingDirectAlert.senderName}
                 </p>
-                <p className="text-[10px] text-foreground-muted truncate max-w-42.5">
+                <p className="text-xs text-foreground-muted truncate max-w-42.5">
                   {incomingDirectAlert.content}
                 </p>
               </div>
@@ -775,7 +775,7 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
                   if (sender) handleOpenPrivateChat(sender);
                   setIncomingDirectAlert(null);
                 }}
-                className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-accent text-white hover:bg-accent-hover transition-colors cursor-pointer"
+                className="text-xs font-bold px-2 py-0.5 rounded-md bg-accent text-white hover:bg-accent-hover transition-colors cursor-pointer"
               >
                 Reply
               </button>
@@ -794,7 +794,7 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
         {/* Tab 1: Members List */}
         {activeTab === 'members' && !privateChatMember ? (
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
-            <div className="px-1 py-0.5 flex items-center justify-between text-[10px] font-mono text-foreground-muted uppercase tracking-wider">
+            <div className="px-1 py-0.5 flex items-center justify-between text-xs font-mono text-foreground-muted uppercase tracking-wider">
               <span>Study Group</span>
               <span className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
@@ -808,7 +808,7 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
                 <p className="text-xs font-medium text-foreground-secondary">
                   No other members yet
                 </p>
-                <p className="text-[11px] text-foreground-muted max-w-47.5">
+                <p className="text-sm text-foreground-muted max-w-47.5">
                   Share the room code to invite peers to your Pomodoro session.
                 </p>
               </div>
@@ -978,7 +978,7 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
                       onClick={() => handleOpenPrivateChat(member)}
                       type="button"
                       className={cn(
-                        'h-7 px-2.5 text-[10px] rounded-lg transition-all cursor-pointer shrink-0 inline-flex items-center gap-1 font-medium border',
+                        'h-7 px-2.5 text-xs rounded-lg transition-all cursor-pointer shrink-0 inline-flex items-center gap-1 font-medium border',
                         unreadCount > 0
                           ? 'bg-accent text-white border-accent shadow-xs'
                           : 'border-border/80 text-foreground-secondary hover:text-accent hover:border-accent/40 bg-surface-elevated'
@@ -1057,7 +1057,7 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
                     ? `Direct chat with ${privateChatMember.name}`
                     : 'No messages yet'}
                 </p>
-                <p className="text-[11px] text-foreground-muted max-w-50">
+                <p className="text-sm text-foreground-muted max-w-50">
                   Send a live note, reaction, or mention someone with @
                 </p>
               </div>
@@ -1075,7 +1075,7 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
                 if (msg.isSystem) {
                   return (
                     <div key={msg.id} className="flex items-center justify-center my-1">
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-subtle/70 border border-border/40 text-[10px] font-mono text-foreground-muted max-w-[95%]">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-subtle/70 border border-border/40 text-xs font-mono text-foreground-muted max-w-[95%]">
                         <Sparkles className="w-2.5 h-2.5 text-accent shrink-0" />
                         <span className="truncate">{msg.content}</span>
                         <span className="text-foreground-muted/60 shrink-0">
@@ -1096,7 +1096,7 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
                     )}
                   >
                     {!isSameSenderAsPrev && (
-                      <div className="flex items-center gap-1.5 text-[10px] font-mono text-foreground-muted px-1 mb-0.5">
+                      <div className="flex items-center gap-1.5 text-xs font-mono text-foreground-muted px-1 mb-0.5">
                         <span className={cn('font-semibold', isMe ? 'text-accent' : 'text-foreground-secondary')}>
                           {isMe ? 'You' : msg.senderName}
                         </span>
@@ -1107,7 +1107,7 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
 
                     <div
                       className={cn(
-                        'rounded-2xl px-3.5 py-1.5 text-xs leading-relaxed shadow-2xs transition-all wrap-break-word',
+                        'rounded-2xl px-3.5 py-1.5 text-sm leading-relaxed shadow-2xs transition-all wrap-break-word',
                         isMe
                           ? 'bg-accent/20 text-foreground border border-accent/35 rounded-tr-xs shadow-2xs backdrop-blur-xs'
                           : 'bg-surface-subtle text-foreground rounded-tl-xs border border-border/60'
@@ -1131,7 +1131,7 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
             ref={mentionPopoverRef}
             className="absolute bottom-full mb-2 left-2.5 right-2.5 bg-surface-elevated/95 border border-accent/40 rounded-xl shadow-2xl p-1.5 z-50 space-y-1 backdrop-blur-xl"
           >
-            <div className="px-2 py-1 border-b border-border/60 flex items-center justify-between text-[9px] font-mono text-foreground-muted">
+            <div className="px-2 py-1 border-b border-border/60 flex items-center justify-between text-[10px] font-mono text-foreground-muted">
               <span className="flex items-center gap-1 font-semibold text-accent">
                 <AtSign className="w-3 h-3" />
                 <span>MENTION STUDY MATE</span>
@@ -1160,13 +1160,13 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
                         className="w-5 h-5 rounded-full object-cover border border-white/20"
                       />
                     ) : (
-                      <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center font-bold text-[10px]">
+                      <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center font-bold text-xs">
                         {(member.name || 'M').charAt(0)}
                       </div>
                     )}
                     <span
                       className={cn(
-                        'w-1.5 h-1.5 rounded-full absolute -bottom-0.2 -right-0.2 ring-1 ring-surface',
+                        'w-1.5 h-1.5 rounded-full absolute -bottom-0.5 -right-0.2 ring-1 ring-surface',
                         member.isOnline ? 'bg-emerald-400' : 'bg-foreground-muted/40'
                       )}
                     />
@@ -1193,7 +1193,7 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
               key={emoji}
               type="button"
               onClick={() => handleQuickReaction(emoji)}
-              className="w-7 h-7 rounded-lg hover:bg-surface-elevated text-xs flex items-center justify-center transition-transform hover:scale-110 active:scale-95 cursor-pointer select-none shrink-0"
+              className="w-8 h-8 rounded-lg hover:bg-surface-elevated text-xs flex items-center justify-center transition-transform hover:scale-110 active:scale-95 cursor-pointer select-none shrink-0"
               title={`React with ${emoji}`}
             >
               {emoji}
@@ -1215,7 +1215,7 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
               value={inputText}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
-              className="w-full h-8 pl-3 pr-2.5 text-xs text-foreground placeholder:text-foreground-muted bg-surface-subtle border border-border/60 rounded-xl focus:border-accent focus:outline-hidden transition-colors"
+              className="w-full h-9 pl-3 pr-2.5 text-sm text-foreground placeholder:text-foreground-muted bg-surface-subtle border border-border/60 rounded-xl focus:border-accent focus:outline-hidden transition-colors"
             />
           </div>
 
@@ -1224,7 +1224,7 @@ export const AstroRoomChatPanel: React.FC<AstroRoomChatPanelProps> = ({
             onClick={() => handleSend()}
             disabled={!inputText.trim()}
             className={cn(
-              'h-8 w-8 rounded-xl flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-95 shrink-0',
+              'h-9 w-9 rounded-xl flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-95 shrink-0',
               inputText.trim()
                 ? 'bg-accent hover:bg-accent-hover text-white'
                 : 'bg-surface-subtle text-foreground-muted/40 cursor-not-allowed border border-border/40'

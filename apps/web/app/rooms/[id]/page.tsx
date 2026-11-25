@@ -429,7 +429,7 @@ function RoomWorkspaceView({ roomId }: { roomId: string }) {
 
         {/* Sticky Mobile Mini-Timer Bar (Shown only when in mobile 'tasks' or 'chat' tab) */}
         {mobileTab !== 'timer' && (
-          <div className="flex lg:hidden items-center justify-between px-3 py-1.5 bg-surface-elevated/95 border-b border-border/80 shadow-xs shrink-0 backdrop-blur-md animate-in fade-in duration-150">
+          <div className="flex flex-col gap-3 lg:hidden items-center justify-center p-3 bg-surface-elevated/95 border-b border-border/80 shadow-xs shrink-0 backdrop-blur-md animate-in fade-in duration-150">
             <button
               type="button"
               onClick={() => setMobileTab('timer')}
@@ -440,7 +440,7 @@ function RoomWorkspaceView({ roomId }: { roomId: string }) {
               <span className="text-xs font-bold text-accent font-mono uppercase">
                 {timerPhase.replace('_', ' ')}
               </span>
-              <span className="text-sm font-extrabold font-mono tabular-nums text-foreground">
+              <span className="text-3xl font-extrabold font-mono tabular-nums text-foreground">
                 {formatTimeRemaining(timerDisplaySeconds)}
               </span>
               <span className="text-[10px] font-mono text-foreground-muted hidden xs:inline">
