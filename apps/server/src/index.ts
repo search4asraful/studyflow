@@ -6,6 +6,7 @@ import { env } from './config/env';
 import { prisma } from './config/prisma';
 import { apiRouter } from './routes';
 import { errorHandler } from './middleware/errorHandler';
+import { nativeCompression } from './middleware/compression';
 import { setupSocketServer } from './sockets/socketServer';
 import { TimerService } from './services/timerService';
 
@@ -41,10 +42,26 @@ app.use(
   })
 );
 
+// High performance response compression for low-RAM / single-core hosts
+app.use(nativeCompression);
+
 // Standard Middlewares
 app.use(cookieParser(env.COOKIE_SECRET));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Lightweight cache headers for low-RAM backends (enables conditional 304 Not Modified)
+app.use((req, res, next) => {
+  if (req.method === 'GET' && req.path.startsWith('/api')) {
+    // Exclude auth check from public caching, but allow private revalidation
+    if (req.path.startsWith('/api/auth/me')) {
+      res.setHeader('Cache-Control', 'private, no-cache');
+    } else {
+      res.setHeader('Cache-Control', 'private, no-cache, stale-while-revalidate=30');
+    }
+  }
+  next();
+});
 
 // Root & Health Check Endpoints (for Render health checks and probes)
 app.get('/', (_req: Request, res: Response) => {

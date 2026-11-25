@@ -13,9 +13,11 @@ export const LandingFooter: React.FC = () => {
           {/* Brand & Identity */}
           <div className="space-y-3 max-w-md">
             <Link href="/" className="inline-flex items-center gap-2.5 group">
-              <div className="w-8 h-8 rounded-xl bg-linear-to-tr from-accent via-blue-500 to-sky-400 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-accent/20 group-hover:scale-105 transition-transform">
-                SF
-              </div>
+              <img
+                src="/studyflow.png"
+                alt="StudyFlow Logo"
+                className="w-10 h-10 rounded-xl object-contain group-hover:scale-105 transition-transform"
+              />
               <span className="font-extrabold text-lg tracking-tight text-foreground">
                 StudyFlow
               </span>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import {
@@ -12,7 +12,6 @@ import {
   Plus,
   Moon,
   Sun,
-  Headphones,
   Sparkles,
   Search,
   X,
@@ -49,7 +48,23 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     setMounted(true);
   }, []);
 
-  // Lock body scroll when open
+  // Pre-warms routes for perceived 0ms instantaneous navigation
+  useEffect(() => {
+    if (isOpen) {
+      try {
+        router.prefetch('/dashboard');
+        router.prefetch('/rooms');
+        router.prefetch('/tasks');
+        router.prefetch('/analytics');
+        router.prefetch('/settings');
+        router.prefetch('/rooms/create');
+      } catch {
+        // Handled silently
+      }
+    }
+  }, [isOpen, router]);
+
+  // Lock body scroll cleanly when open without horizontal layout jump
   useEffect(() => {
     if (isOpen) {
       const originalOverflow = document.body.style.overflow;
@@ -60,103 +75,121 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     }
   }, [isOpen]);
 
-  const commands: CommandItem[] = [
-    {
-      id: 'nav-dashboard',
-      category: 'Navigation',
-      title: 'Go to Dashboard',
-      subtitle: 'Overview of focus streak, weekly trends & active rooms',
-      icon: <LayoutDashboard className="w-4 h-4 text-accent" />,
-      shortcut: 'G D',
-      action: () => router.push('/dashboard'),
-    },
-    {
-      id: 'nav-rooms',
-      category: 'Navigation',
-      title: 'Browse Study Rooms',
-      subtitle: 'Join public rooms or enter with an invite code',
-      icon: <Timer className="w-4 h-4 text-accent" />,
-      shortcut: 'G R',
-      action: () => router.push('/rooms'),
-    },
-    {
-      id: 'nav-tasks',
-      category: 'Navigation',
-      title: 'View My Tasks',
-      subtitle: 'Manage and update your personal and room action items',
-      icon: <CheckSquare className="w-4 h-4 text-accent" />,
-      shortcut: 'G T',
-      action: () => router.push('/tasks'),
-    },
-    {
-      id: 'nav-analytics',
-      category: 'Navigation',
-      title: 'View Productivity Analytics',
-      subtitle: 'Detailed charts, streak statistics & focus allocations',
-      icon: <BarChart3 className="w-4 h-4 text-accent" />,
-      shortcut: 'G A',
-      action: () => router.push('/analytics'),
-    },
-    {
-      id: 'nav-settings',
-      category: 'Navigation',
-      title: 'Settings & Profile',
-      subtitle: 'Personalize sound chimes, targets and security',
-      icon: <Settings className="w-4 h-4 text-accent" />,
-      shortcut: 'G S',
-      action: () => router.push('/settings'),
-    },
-    {
-      id: 'act-create-room',
-      category: 'Actions',
-      title: 'Create a New Study Room',
-      subtitle: 'Configure Pomodoro intervals and private access',
-      icon: <Plus className="w-4 h-4 text-emerald-400" />,
-      shortcut: 'C R',
-      action: () => router.push('/rooms/create'),
-    },
-    {
-      id: 'act-toggle-theme',
-      category: 'Actions',
-      title: `Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`,
-      subtitle: 'Toggle between Midnight Navy and Ice-Blue theme',
-      icon: theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-400" />,
-      shortcut: 'T',
-      action: () => toggleTheme(),
-    },
-    {
-      id: 'act-confetti',
-      category: 'Tools',
-      title: 'Celebrate with Confetti Burst',
-      subtitle: 'Sparkling particle animation reward',
-      icon: <Sparkles className="w-4 h-4 text-amber-400" />,
-      action: () => triggerConfetti({ particleCount: 100 }),
-    },
-  ];
-
-  const filteredCommands = commands.filter(
-    (c) =>
-      c.title.toLowerCase().includes(search.toLowerCase()) ||
-      (c.subtitle && c.subtitle.toLowerCase().includes(search.toLowerCase())) ||
-      c.category.toLowerCase().includes(search.toLowerCase())
+  const commands: CommandItem[] = useMemo(
+    () => [
+      {
+        id: 'nav-dashboard',
+        category: 'Navigation',
+        title: 'Go to Dashboard',
+        subtitle: 'Overview of focus streak, weekly trends & active rooms',
+        icon: <LayoutDashboard className="w-4 h-4 text-accent" />,
+        shortcut: 'G D',
+        action: () => router.push('/dashboard'),
+      },
+      {
+        id: 'nav-rooms',
+        category: 'Navigation',
+        title: 'Browse Study Rooms',
+        subtitle: 'Join public rooms or enter with an invite code',
+        icon: <Timer className="w-4 h-4 text-accent" />,
+        shortcut: 'G R',
+        action: () => router.push('/rooms'),
+      },
+      {
+        id: 'nav-tasks',
+        category: 'Navigation',
+        title: 'View My Tasks',
+        subtitle: 'Manage and update your personal and room action items',
+        icon: <CheckSquare className="w-4 h-4 text-accent" />,
+        shortcut: 'G T',
+        action: () => router.push('/tasks'),
+      },
+      {
+        id: 'nav-analytics',
+        category: 'Navigation',
+        title: 'View Productivity Analytics',
+        subtitle: 'Detailed charts, streak statistics & focus allocations',
+        icon: <BarChart3 className="w-4 h-4 text-accent" />,
+        shortcut: 'G A',
+        action: () => router.push('/analytics'),
+      },
+      {
+        id: 'nav-settings',
+        category: 'Navigation',
+        title: 'Settings & Profile',
+        subtitle: 'Personalize sound chimes, targets and security',
+        icon: <Settings className="w-4 h-4 text-accent" />,
+        shortcut: 'G S',
+        action: () => router.push('/settings'),
+      },
+      {
+        id: 'act-create-room',
+        category: 'Actions',
+        title: 'Create a New Study Room',
+        subtitle: 'Configure Pomodoro intervals and private access',
+        icon: <Plus className="w-4 h-4 text-emerald-400" />,
+        shortcut: 'C R',
+        action: () => router.push('/rooms/create'),
+      },
+      {
+        id: 'act-toggle-theme',
+        category: 'Actions',
+        title: `Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`,
+        subtitle: 'Toggle between Midnight Navy and Ice-Blue theme',
+        icon: theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-400" />,
+        shortcut: 'T',
+        action: () => toggleTheme(),
+      },
+      {
+        id: 'act-confetti',
+        category: 'Tools',
+        title: 'Celebrate with Confetti Burst',
+        subtitle: 'Sparkling particle animation reward',
+        icon: <Sparkles className="w-4 h-4 text-amber-400" />,
+        action: () => triggerConfetti({ particleCount: 100 }),
+      },
+    ],
+    [router, theme, toggleTheme]
   );
 
+  const filteredCommands = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return commands;
+    return commands.filter(
+      (c) =>
+        c.title.toLowerCase().includes(q) ||
+        (c.subtitle && c.subtitle.toLowerCase().includes(q)) ||
+        c.category.toLowerCase().includes(q)
+    );
+  }, [commands, search]);
+
+  // Instant zero-delay focus on open
   useEffect(() => {
     if (isOpen) {
       setSearch('');
       setSelectedIndex(0);
-      setTimeout(() => inputRef.current?.focus(), 50);
+      // Synchronous immediate microtask focus with fallback to rAF
+      requestAnimationFrame(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+          inputRef.current.select();
+        }
+      });
     }
   }, [isOpen]);
 
-  useEffect(() => {
-    setSelectedIndex(0);
-  }, [search]);
+  const handleSelect = useCallback(
+    (command: CommandItem) => {
+      onClose();
+      command.action();
+    },
+    [onClose]
+  );
 
   useEffect(() => {
+    if (!isOpen) return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!isOpen) return;
-
       if (e.key === 'Escape') {
         e.preventDefault();
         onClose();
@@ -169,55 +202,85 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
       } else if (e.key === 'Enter') {
         e.preventDefault();
         if (filteredCommands[selectedIndex]) {
-          filteredCommands[selectedIndex].action();
-          onClose();
+          handleSelect(filteredCommands[selectedIndex]);
         }
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, { passive: false });
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, filteredCommands, selectedIndex, onClose]);
+  }, [isOpen, filteredCommands, selectedIndex, onClose, handleSelect]);
 
-  if (!isOpen || !mounted) return null;
+  if (!mounted) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 px-4">
-      {/* Backdrop */}
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Command Palette"
+      aria-hidden={!isOpen}
+      className={cn(
+        'fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-20 px-4 transition-all duration-100 ease-out',
+        isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+      )}
+    >
+      {/* High-speed hardware-accelerated Backdrop without GPU filter blur lag */}
       <div
         onClick={onClose}
-        className="fixed inset-0 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150 transform-gpu"
+        className={cn(
+          'fixed inset-0 bg-black/60 transition-opacity duration-100 ease-out',
+          isOpen ? 'opacity-100' : 'opacity-0'
+        )}
       />
 
-      {/* Palette Dialog Box */}
-      <div className="relative w-full max-w-xl card-elevated p-0 overflow-hidden shadow-2xl z-10 animate-in fade-in zoom-in-95 duration-150 border-accent/30 transform-gpu">
+      {/* Palette Dialog Box: Snappy 100ms scale/translate */}
+      <div
+        className={cn(
+          'relative w-full max-w-xl card-elevated p-0 overflow-hidden shadow-2xl z-10 border-accent/30 transition-all duration-100 ease-out transform-gpu',
+          isOpen
+            ? 'scale-100 opacity-100 translate-y-0'
+            : 'scale-[0.98] opacity-0 -translate-y-2'
+        )}
+      >
         {/* Search Input Bar */}
-        <div className="flex items-center gap-3 px-4 py-3.5 border-b border-border bg-surface-elevated/50">
+        <div className="flex items-center gap-3 px-4 py-3.5 border-b border-border bg-surface-elevated/70">
           <Search className="w-5 h-5 text-accent shrink-0" />
           <input
             ref={inputRef}
             type="text"
             placeholder="Type a command or search (e.g. rooms, tasks, theme)..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setSelectedIndex(0);
+            }}
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
             className="w-full bg-transparent text-sm text-foreground placeholder:text-foreground-muted focus:outline-hidden"
           />
           {search ? (
             <button
-              onClick={() => setSearch('')}
+              onClick={() => {
+                setSearch('');
+                setSelectedIndex(0);
+                inputRef.current?.focus();
+              }}
               className="text-foreground-muted hover:text-foreground p-1 rounded-sm cursor-pointer"
+              type="button"
+              title="Clear search"
             >
               <X className="w-4 h-4" />
             </button>
           ) : (
-            <kbd className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-mono text-foreground-muted bg-surface-subtle border border-border rounded-md">
+            <kbd className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-mono text-foreground-muted bg-surface-subtle border border-border rounded-md select-none">
               ESC
             </kbd>
           )}
         </div>
 
         {/* Results List */}
-        <div className="max-h-80 overflow-y-auto p-2 space-y-1">
+        <div className="max-h-80 overflow-y-auto p-2 space-y-1 overscroll-contain">
           {filteredCommands.length === 0 ? (
             <div className="text-center py-10 text-xs text-foreground-muted">
               No matching commands or destinations found.
@@ -228,13 +291,13 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
               return (
                 <button
                   key={command.id}
-                  onClick={() => {
-                    command.action();
-                    onClose();
+                  onClick={() => handleSelect(command)}
+                  onMouseEnter={() => {
+                    if (selectedIndex !== idx) setSelectedIndex(idx);
                   }}
-                  onMouseEnter={() => setSelectedIndex(idx)}
+                  type="button"
                   className={cn(
-                    'w-full flex items-center justify-between p-3 rounded-xl text-left transition-all cursor-pointer',
+                    'w-full flex items-center justify-between p-3 rounded-xl text-left transition-colors duration-75 cursor-pointer select-none',
                     isSelected
                       ? 'bg-accent/15 border border-accent/40 text-foreground'
                       : 'hover:bg-surface-subtle text-foreground-secondary hover:text-foreground border border-transparent'
@@ -243,7 +306,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
                   <div className="flex items-center gap-3 min-w-0">
                     <div
                       className={cn(
-                        'w-8 h-8 rounded-lg flex items-center justify-center border shrink-0',
+                        'w-8 h-8 rounded-lg flex items-center justify-center border shrink-0 transition-colors duration-75',
                         isSelected
                           ? 'bg-accent/25 border-accent text-accent'
                           : 'bg-surface-subtle border-border'
@@ -274,7 +337,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
                     )}
                     <ArrowRight
                       className={cn(
-                        'w-3.5 h-3.5 transition-transform',
+                        'w-3.5 h-3.5 transition-transform duration-75',
                         isSelected ? 'text-accent translate-x-0.5' : 'text-transparent'
                       )}
                     />
@@ -286,7 +349,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
         </div>
 
         {/* Footer Shortcut Hints */}
-        <div className="px-4 py-2.5 bg-surface-subtle/80 border-t border-border flex items-center justify-between text-[11px] text-foreground-muted">
+        <div className="px-4 py-2.5 bg-surface-subtle/80 border-t border-border flex items-center justify-between text-[11px] text-foreground-muted select-none">
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1">
               <kbd className="px-1.5 py-0.5 rounded-sm bg-surface border border-border font-mono text-[10px]">↑↓</kbd>{' '}

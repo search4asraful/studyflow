@@ -396,6 +396,13 @@ export function setupSocketServer(httpServer: HttpServer): SocketIOServer {
       }
     });
 
+    // Real-time latency measurement ping
+    socket.on('studyflow:ping', (callback) => {
+      if (typeof callback === 'function') {
+        callback({ ok: true, timestamp: Date.now() });
+      }
+    });
+
     // Handle disconnect
     socket.on('disconnect', () => {
       for (const roomId of socket.data.joinedRooms) {

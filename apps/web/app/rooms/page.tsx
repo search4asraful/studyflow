@@ -4,10 +4,16 @@ import React, { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AppShell } from '../../components/layout/AppShell';
-import { apiRequest } from '../../lib/api';
+import {
+  apiRequest,
+  cachedApiRequest,
+  invalidateApiCache,
+  subscribeToRevalidation,
+} from '../../lib/api';
 import { StudyRoom } from '@studyflow/shared';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { CreateRoomModal } from '../../components/rooms/CreateRoomModal';
 import {
   Plus,
   Users,
@@ -34,19 +40,41 @@ function RoomsContent() {
   const [searchFilter, setSearchFilter] = useState('');
   const [filterType, setFilterType] = useState<'ALL' | 'PUBLIC' | 'PRIVATE'>('ALL');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(searchParams.get('create') === 'true');
 
   useEffect(() => {
+    if (searchParams.get('create') === 'true') {
+      setIsCreateModalOpen(true);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    let active = true;
+
     async function loadRooms() {
       try {
-        const data = await apiRequest<StudyRoom[]>('/rooms');
-        setRooms(data);
+        const data = await cachedApiRequest<StudyRoom[]>('/rooms');
+        if (active) {
+          setRooms(data);
+          setLoading(false);
+        }
       } catch (err: any) {
-        toast.error(err.message || 'Failed to fetch rooms');
-      } finally {
-        setLoading(false);
+        if (active) {
+          toast.error(err.message || 'Failed to fetch rooms');
+          setLoading(false);
+        }
       }
     }
     loadRooms();
+
+    const unsub = subscribeToRevalidation<StudyRoom[]>('/rooms', (data) => {
+      if (active && data) setRooms(data);
+    });
+
+    return () => {
+      active = false;
+      unsub();
+    };
   }, []);
 
   const handleJoinByCode = async (e: React.FormEvent) => {
@@ -59,6 +87,7 @@ function RoomsContent() {
         method: 'POST',
         body: JSON.stringify({ inviteCode: inviteCode.trim().toUpperCase() }),
       });
+      invalidateApiCache('/rooms');
       toast.success(`Joined room: ${room.name}!`);
       router.push(`/rooms/${room.id}`);
     } catch (err: any) {
@@ -101,12 +130,15 @@ function RoomsContent() {
           </p>
         </div>
 
-        <Link href="/rooms/create">
-          <Button variant="primary" size="md" className="gap-2 font-semibold shadow-md shadow-accent/25">
-            <Plus className="w-4 h-4" />
-            Create Study Room
-          </Button>
-        </Link>
+        <Button
+          variant="primary"
+          size="md"
+          onClick={() => setIsCreateModalOpen(true)}
+          className="gap-2 font-semibold shadow-md shadow-accent/25"
+        >
+          <Plus className="w-4 h-4" />
+          Create Study Room
+        </Button>
       </div>
 
       {/* Join via Code Hero Card */}
@@ -252,6 +284,12 @@ function RoomsContent() {
           </div>
         )}
       </div>
+
+      {/* Redesigned Create Room Modal */}
+      <CreateRoomModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+      />
     </div>
   );
 }

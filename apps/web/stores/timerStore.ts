@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { AuthoritativeTimerState, TimerPhase, TimerStatus } from '@studyflow/shared';
+import { playTimerCountdownTick, playCompletionChime } from '../lib/audio';
 
 interface TimerStoreState {
   authoritativeState: AuthoritativeTimerState | null;
@@ -26,12 +27,30 @@ export const useTimerStore = create<TimerStoreState>((set, get) => ({
   percentRemaining: 100,
 
   syncAuthoritativeState: (state) => {
+    const prevState = get().authoritativeState;
+    if (
+      prevState &&
+      (prevState.phase !== state.phase ||
+        (state.status === 'COMPLETED' && prevState.status !== 'COMPLETED'))
+    ) {
+      playCompletionChime();
+    }
+
     const duration = state.totalPhaseDuration || 1500;
-    const percent = Math.min(100, Math.max(0, (state.remainingSeconds / duration) * 100));
+    let accurateRemaining = state.remainingSeconds;
+
+    if (state.status === 'RUNNING' && state.startedAt) {
+      const elapsed = Math.floor((Date.now() - new Date(state.startedAt).getTime()) / 1000);
+      if (elapsed > 0) {
+        accurateRemaining = Math.max(0, state.remainingSeconds - elapsed);
+      }
+    }
+
+    const percent = Math.min(100, Math.max(0, (accurateRemaining / duration) * 100));
 
     set({
       authoritativeState: state,
-      displaySeconds: state.remainingSeconds,
+      displaySeconds: accurateRemaining,
       phase: state.phase,
       status: state.status,
       currentCycle: state.currentCycle,
@@ -66,6 +85,14 @@ export const useTimerStore = create<TimerStoreState>((set, get) => ({
         displaySeconds: nextSeconds,
         percentRemaining: percent,
       });
+
+      // Warning countdown audio 2-3 seconds before cycle ends
+      if (nextSeconds > 0 && nextSeconds <= 3 && state.totalPhaseDuration > 5) {
+        playTimerCountdownTick(nextSeconds);
+      } else if (nextSeconds === 0) {
+        // Cycle fully complete! Play digital alarm clock sound
+        playCompletionChime();
+      }
     }
   },
 

@@ -1,11 +1,17 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from 'sonner';
+import { SingleTabGuard } from '../components/layout/SingleTabGuard';
 
 export const metadata: Metadata = {
   title: 'StudyFlow — Collaborative Digital Study Environment',
   description:
     'Real-time collaborative study platform with authoritative synchronized Pomodoro timers, shared task boards, and productivity analytics.',
+  icons: {
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
+    apple: '/studyflow.png',
+  },
 };
 
 export default function RootLayout({
@@ -23,6 +29,7 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen bg-canvas text-foreground antialiased transition-colors duration-200">
+        <SingleTabGuard />
         {children}
         <Toaster
           position="bottom-right"

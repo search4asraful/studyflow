@@ -369,10 +369,19 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
     });
   }, [localTasks, searchQuery, priorityFilter]);
 
-  // Overall Task Progress calculations
+  // Overall Task Progress & Status Breakdown calculations
   const totalTasksCount = localTasks.length;
   const completedTasksCount = localTasks.filter((t) => t.status === 'COMPLETED').length;
   const progressPercent = totalTasksCount > 0 ? Math.round((completedTasksCount / totalTasksCount) * 100) : 0;
+
+  const statusCounts = useMemo(() => {
+    return {
+      BACKLOG: localTasks.filter((t) => t.status === 'BACKLOG').length,
+      TODO: localTasks.filter((t) => t.status === 'TODO').length,
+      IN_PROGRESS: localTasks.filter((t) => t.status === 'IN_PROGRESS').length,
+      COMPLETED: localTasks.filter((t) => t.status === 'COMPLETED').length,
+    };
+  }, [localTasks]);
 
   // Tween progress bar with GSAP whenever progressPercent changes
   useGSAP(
@@ -558,64 +567,103 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
 
   return (
     <div ref={containerRef} className={cn('flex flex-col h-full min-h-0 w-full overflow-hidden gap-2 sm:gap-2.5', className)}>
-      {/* Task Filter & Overall Progress Strip */}
-      <div className="p-2 sm:p-2.5 rounded-xl bg-surface/90 border border-border/80 shadow-xs space-y-1.5 shrink-0 transition-colors duration-200">
-        <div className="flex items-center justify-between gap-2">
-          {/* Search & Priority Filter Controls */}
+      {/* Redesigned Task Filter & Sprint Progress Strip */}
+      <div className="p-2.5 sm:p-3 rounded-2xl bg-surface/90 backdrop-blur-xl border border-border/80 shadow-xs space-y-2.5 shrink-0 transition-colors duration-200">
+        {/* Top Controls: Search Input, Priority Filter Pills, & Single Authoritative Add Task */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-2.5">
+          {/* Search Box with dynamic clear button */}
           <div className="relative flex-1 min-w-0">
-            <Search className="w-3.5 h-3.5 text-foreground-muted absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Search className="w-3.5 h-3.5 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
-              placeholder="Filter tasks..."
+              placeholder="Filter tasks by title, description, or assignee..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-8 pl-8 pr-2.5 text-xs text-foreground placeholder:text-foreground-muted bg-surface-subtle border border-border rounded-lg focus:border-accent focus:outline-hidden transition-colors"
+              className="w-full h-8 pl-8.5 pr-8 text-xs text-foreground placeholder:text-foreground-muted bg-surface-subtle hover:bg-surface-elevated/70 border border-border rounded-xl focus:border-accent focus:ring-1 focus:ring-accent/30 focus:outline-hidden transition-all shadow-2xs"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground p-0.5 rounded-full hover:bg-surface transition-colors cursor-pointer"
+                title="Clear filter"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
-            <Filter className="w-3.5 h-3.5 text-foreground-muted hidden xs:inline" />
-            <select
-              value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value)}
-              className="h-8 bg-surface-subtle border border-border focus:border-accent rounded-lg px-2 text-xs text-foreground outline-hidden transition-colors cursor-pointer"
-            >
-              <option value="ALL">All</option>
-              <option value="LOW">Low</option>
-              <option value="MEDIUM">Med</option>
-              <option value="HIGH">High</option>
-              <option value="URGENT">Urg</option>
-            </select>
+          {/* Priority Filter Segmented Chips (clean without redundant counts) */}
+          <div className="flex items-center gap-1 shrink-0 overflow-x-auto pb-0.5 sm:pb-0">
+            {[
+              { id: 'ALL', label: 'All', dot: null },
+              { id: 'URGENT', label: 'Urgent', dot: 'bg-rose-500' },
+              { id: 'HIGH', label: 'High', dot: 'bg-orange-500' },
+              { id: 'MEDIUM', label: 'Med', dot: 'bg-amber-400' },
+              { id: 'LOW', label: 'Low', dot: 'bg-slate-400' },
+            ].map((p) => {
+              const isSelected = priorityFilter === p.id;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setPriorityFilter(p.id)}
+                  className={cn(
+                    'h-8 px-2.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap border select-none active:scale-95',
+                    isSelected
+                      ? 'bg-accent text-white border-accent shadow-xs font-semibold'
+                      : 'bg-surface-subtle hover:bg-surface-elevated text-foreground-secondary border-border/70 hover:border-accent/40 hover:text-foreground'
+                  )}
+                  title={`Filter by ${p.label} priority`}
+                >
+                  {p.dot && (
+                    <span
+                      className={cn(
+                        'w-1.5 h-1.5 rounded-full shrink-0',
+                        isSelected ? 'bg-white' : p.dot
+                      )}
+                    />
+                  )}
+                  <span>{p.label}</span>
+                </button>
+              );
+            })}
           </div>
 
-          {/* Add Room Task CTA Button */}
+          {/* Single Authoritative Add Task CTA */}
           {onOpenCreateModal && (
             <Button
               onClick={onOpenCreateModal}
               size="sm"
-              className="h-8 px-2.5 sm:px-3 btn-primary bg-accent hover:bg-accent-hover active:scale-95 text-white shadow-xs rounded-lg font-semibold text-xs gap-1.5 whitespace-nowrap cursor-pointer transition-all shrink-0"
+              className="h-8 px-3.5 btn-primary bg-accent hover:bg-accent-hover active:scale-95 text-white shadow-xs rounded-xl font-semibold text-xs gap-1.5 whitespace-nowrap cursor-pointer transition-all shrink-0"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span className="hidden xs:inline">Add Task</span>
-              <span className="xs:hidden">Task</span>
+              <span>Add Task</span>
             </Button>
           )}
         </div>
 
-        {/* Overall Task Progress Strip */}
-        <div className="space-y-0.5 pt-0.5">
-          <div className="flex items-center justify-between text-[10px] font-mono text-foreground-secondary">
-            <span className="flex items-center gap-1">
-              <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
-              <span className="font-semibold tracking-wide text-foreground">Progress</span>
+        {/* Clean Sprint Progress Strip without duplicate column status counts */}
+        <div className="pt-2 border-t border-border/50 space-y-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="flex items-center gap-1.5 font-semibold text-foreground text-xs">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span>Sprint Progress</span>
             </span>
-            <span ref={progressPercentTextRef} className="font-bold text-foreground">
-              {completedTasksCount}/{totalTasksCount} resolved ({progressPercent}%)
-            </span>
+
+            {/* Resolution Counter & Percent Badge */}
+            <div className="flex items-center gap-2 font-mono text-xs">
+              <span className="text-foreground-secondary text-[11px]">
+                <strong className="text-foreground font-semibold">{completedTasksCount}</strong>/{totalTasksCount} resolved
+              </span>
+              <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 border border-emerald-500/30 shadow-2xs">
+                {progressPercent}%
+              </span>
+            </div>
           </div>
 
-          {/* Progress Bar Track */}
-          <div className="w-full h-1 bg-surface-subtle rounded-full overflow-hidden border border-border-subtle relative">
+          {/* Animated GSAP Completion Progress Bar Track */}
+          <div className="w-full h-1.5 bg-surface-subtle rounded-full overflow-hidden border border-border/70 relative shadow-inner">
             <div
               ref={progressBarRef}
               className="h-full bg-linear-to-r from-accent via-sky-400 to-emerald-400 rounded-full transition-none relative shadow-xs"

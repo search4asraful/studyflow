@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { triggerConfetti } from '../../lib/confetti';
+import { playTimerCountdownTick, playCompletionChime } from '../../lib/audio';
 
 export interface PomodoroTimerProps {
   onStart?: () => void;
@@ -106,8 +107,12 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({
       timer = setInterval(() => {
         setLocalSeconds((prev) => {
           const cur = prev !== null ? prev : totalCycleSeconds;
+          if (cur <= 4 && cur > 1) {
+            playTimerCountdownTick(cur - 1);
+          }
           if (cur <= 1) {
             setIsLocalRunning(false);
+            playCompletionChime();
             triggerConfetti({ particleCount: 90 });
 
             if (phase === 'FOCUS') {
@@ -128,10 +133,11 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({
     return () => clearInterval(timer);
   }, [isAuthoritative, isLocalRunning, secondsRemaining, phase, currentCycle, cyclesTotal, totalCycleSeconds]);
 
-  // Phase transition confetti celebration
+  // Phase transition confetti & completion chime celebration
   const prevPhaseRef = useRef(phase);
   useEffect(() => {
     if (prevPhaseRef.current !== phase) {
+      playCompletionChime();
       if (prevPhaseRef.current === 'FOCUS') {
         triggerConfetti({ particleCount: 90 });
       }
@@ -436,9 +442,11 @@ export const PomodoroTimer: React.FC<PomodoroTimerProps> = ({
             {/* Zen Header */}
             <div className="flex items-center justify-between w-full max-w-4xl">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-accent text-white flex items-center justify-center font-bold text-xs shadow-md">
-                  SF
-                </div>
+                <img
+                  src="/studyflow.png"
+                  alt="StudyFlow Logo"
+                  className="w-10 h-10 rounded-xl object-contain"
+                />
                 <div>
                   <h2 className="text-sm font-bold text-white tracking-tight">
                     {room?.name || 'Study Room'}

@@ -24,7 +24,13 @@ import { EditTaskModal } from '../../components/tasks/EditTaskModal';
 import { WorkspaceKanban } from '../../components/tasks/WorkspaceKanban';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { apiRequest } from '../../lib/api';
+import {
+  apiRequest,
+  cachedApiRequest,
+  mutateApiCache,
+  invalidateApiCache,
+  subscribeToRevalidation,
+} from '../../lib/api';
 import { playTaskCompletionSound } from '../../lib/audio';
 import { triggerConfetti } from '../../lib/confetti';
 
@@ -40,44 +46,89 @@ export default function MyTasksPage() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
   useEffect(() => {
+    let active = true;
+
     async function loadData() {
       try {
         const [tasksData, roomsData] = await Promise.all([
-          apiRequest<Task[]>('/tasks/my'),
-          apiRequest<StudyRoom[]>('/rooms').catch(() => []),
+          cachedApiRequest<Task[]>('/tasks/my'),
+          cachedApiRequest<StudyRoom[]>('/rooms').catch(() => []),
         ]);
-        setTasks(tasksData);
-        setRooms(roomsData);
+        if (active) {
+          setTasks(tasksData);
+          setRooms(roomsData);
+          setLoading(false);
+        }
       } catch (err: any) {
-        toast.error(err.message || 'Failed to load tasks');
-      } finally {
-        setLoading(false);
+        if (active) {
+          toast.error(err.message || 'Failed to load tasks');
+          setLoading(false);
+        }
       }
     }
     loadData();
+
+    // SWR revalidation listeners
+    const unsub1 = subscribeToRevalidation<Task[]>('/tasks/my', (data) => {
+      if (active && data) setTasks(data);
+    });
+    const unsub2 = subscribeToRevalidation<StudyRoom[]>('/rooms', (data) => {
+      if (active && data) setRooms(data);
+    });
+
+    return () => {
+      active = false;
+      unsub1();
+      unsub2();
+    };
   }, []);
 
   const handleToggleComplete = async (task: Task) => {
     const nextStatus: TaskStatus = task.status === 'COMPLETED' ? 'TODO' : 'COMPLETED';
+    const previousTasks = [...tasks];
+
+    // 1. Instant 0ms Optimistic UI update
+    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: nextStatus } : t)));
+
+    // 2. Instant sensory feedback
+    if (nextStatus === 'COMPLETED') {
+      triggerConfetti({ particleCount: 70 });
+      playTaskCompletionSound();
+      toast.success('Task marked as completed! 🎉');
+    } else {
+      toast.info('Task reopened');
+    }
+
+    // 3. Mutate cache optimistically
+    mutateApiCache<Task[]>('/tasks/my', (cached) =>
+      cached ? cached.map((t) => (t.id === task.id ? { ...t, status: nextStatus } : t)) : []
+    );
+
+    // 4. Background network sync with rollback on failure
     try {
       const updated = await apiRequest<Task>(`/tasks/${task.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ status: nextStatus }),
       });
       setTasks((prev) => prev.map((t) => (t.id === task.id ? updated : t)));
-      if (nextStatus === 'COMPLETED') {
-        triggerConfetti({ particleCount: 70 });
-        playTaskCompletionSound();
-        toast.success('Task marked as completed! 🎉');
-      } else {
-        toast.success('Task reopened');
-      }
+      invalidateApiCache('/analytics/summary');
     } catch (err: any) {
+      setTasks(previousTasks);
+      mutateApiCache<Task[]>('/tasks/my', () => previousTasks);
       toast.error(err.message || 'Failed to update task');
     }
   };
 
   const handleUpdateTask = async (taskId: string, updates: Partial<Task>) => {
+    const previousTasks = [...tasks];
+
+    // 1. Instant optimistic update
+    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, ...updates } : t)));
+    mutateApiCache<Task[]>('/tasks/my', (cached) =>
+      cached ? cached.map((t) => (t.id === taskId ? { ...t, ...updates } : t)) : []
+    );
+
+    // 2. Background sync with rollback
     try {
       const updated = await apiRequest<Task>(`/tasks/${taskId}`, {
         method: 'PATCH',
@@ -85,8 +136,9 @@ export default function MyTasksPage() {
       });
       setTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
     } catch (err: any) {
+      setTasks(previousTasks);
+      mutateApiCache<Task[]>('/tasks/my', () => previousTasks);
       toast.error(err.message || 'Failed to update task');
-      setTasks((prev) => [...prev]);
     }
   };
 
@@ -95,11 +147,22 @@ export default function MyTasksPage() {
     if (!window.confirm(`Are you sure you want to delete "${task?.title || 'this task'}"?`)) {
       return;
     }
+    const previousTasks = [...tasks];
+
+    // 1. Instant optimistic deletion
+    setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    mutateApiCache<Task[]>('/tasks/my', (cached) =>
+      cached ? cached.filter((t) => t.id !== taskId) : []
+    );
+    toast.success('Task deleted');
+
+    // 2. Background sync with rollback
     try {
       await apiRequest(`/tasks/${taskId}`, { method: 'DELETE' });
-      setTasks((prev) => prev.filter((t) => t.id !== taskId));
-      toast.success('Task deleted');
+      invalidateApiCache('/analytics/summary');
     } catch (err: any) {
+      setTasks(previousTasks);
+      mutateApiCache<Task[]>('/tasks/my', () => previousTasks);
       toast.error(err.message || 'Failed to delete task');
     }
   };
@@ -110,6 +173,30 @@ export default function MyTasksPage() {
       toast.error('Please join or create a study room first.');
       return;
     }
+
+    const tempId = `temp_${Date.now()}`;
+    const optimisticTask: Task = {
+      id: tempId,
+      roomId: targetRoomId,
+      title: taskData.title,
+      description: taskData.description || null,
+      status: taskData.status || 'TODO',
+      priority: taskData.priority || 'MEDIUM',
+      assigneeId: null,
+      assignee: null,
+      createdById: 'me',
+      dueDate: taskData.dueDate || null,
+      position: tasks.length,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    // 1. Instant optimistic add & close modal
+    setTasks((prev) => [optimisticTask, ...prev]);
+    setIsCreateModalOpen(false);
+    toast.success('Task created! 🎉');
+
+    // 2. Background network call
     try {
       const created = await apiRequest<Task>('/tasks', {
         method: 'POST',
@@ -118,10 +205,11 @@ export default function MyTasksPage() {
           roomId: targetRoomId,
         }),
       });
-      setTasks((prev) => [created, ...prev]);
-      toast.success('Task created successfully! 🎉');
-      setIsCreateModalOpen(false);
+      setTasks((prev) => prev.map((t) => (t.id === tempId ? created : t)));
+      invalidateApiCache('/tasks/my');
+      invalidateApiCache('/analytics/summary');
     } catch (err: any) {
+      setTasks((prev) => prev.filter((t) => t.id !== tempId));
       toast.error(err.message || 'Failed to create task');
     }
   };
