@@ -59,3 +59,33 @@ export function reconnectSocket(): void {
     }
   }
 }
+
+/**
+ * Measures round-trip latency to the Socket.IO server in milliseconds.
+ * Returns null if the socket is disconnected or timed out.
+ */
+export function measureSocketPing(): Promise<number | null> {
+  if (typeof window === 'undefined') return Promise.resolve(null);
+  const s = getSocket();
+  if (!s || !s.connected) return Promise.resolve(null);
+
+  return new Promise((resolve) => {
+    const start = performance.now();
+    const timeout = setTimeout(() => resolve(null), 3000);
+
+    try {
+      s.emit('studyflow:ping', (res: any) => {
+        clearTimeout(timeout);
+        if (res?.ok) {
+          const rtt = Math.max(1, Math.round(performance.now() - start));
+          resolve(rtt);
+        } else {
+          resolve(null);
+        }
+      });
+    } catch {
+      clearTimeout(timeout);
+      resolve(null);
+    }
+  });
+}

@@ -9,13 +9,13 @@ import {
   CheckSquare,
   BarChart3,
   Settings,
-  Sparkles,
   Plus,
   LogOut,
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { cn } from '../../lib/utils';
 import { prefetchApi } from '../../lib/api';
+import { OnlineActivityStatus } from './OnlineActivityStatus';
 
 export const Sidebar: React.FC = () => {
   const pathname = usePathname();
@@ -109,29 +109,10 @@ export const Sidebar: React.FC = () => {
         </div>
       </div>
 
-      {/* Bottom Section: Attribution & Sign Out */}
+      {/* Bottom Section: Activity Status & Sign Out */}
       <div className="space-y-3 pt-3 border-t border-border/80">
-        {/* Attribution Card */}
-        <div className="card-subtle space-y-2 p-3 border-accent/20 bg-surface-subtle/50">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
-              <Sparkles className="w-3.5 h-3.5 text-accent" />
-              <span>StudyFlow Workspace</span>
-            </div>
-          </div>
-          <p className="text-[11px] text-foreground-muted leading-relaxed">
-            Real-time synchronized Pomodoro with sub-50ms latency.
-          </p>
-          <div className="text-[10px] text-foreground-secondary pt-1 flex items-center justify-between">
-            <Link href="/credits" className="hover:text-accent font-medium transition-colors">
-              Specs &amp; Team
-            </Link>
-            <span className="text-emerald-400 font-mono text-[10px] flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Active
-            </span>
-          </div>
-        </div>
+        {/* Dynamic Online Activity & Peer Reachability Card */}
+        <OnlineActivityStatus />
 
         {/* Sign Out Button */}
         <button
