@@ -108,27 +108,32 @@ export function setupSocketServer(httpServer: HttpServer): SocketIOServer {
 
         // Verify or auto-join member
         const roomDetails = await RoomService.getRoomDetails(roomId, user.id);
+        const resolvedRoomId = roomDetails.room.id;
 
-        socket.join(`room:${roomId}`);
-        socket.data.joinedRooms.add(roomId);
+        socket.join(`room:${resolvedRoomId}`);
+        socket.data.joinedRooms.add(resolvedRoomId);
+        if (resolvedRoomId !== roomId) {
+          socket.join(`room:${roomId}`);
+          socket.data.joinedRooms.add(roomId);
+        }
 
-        TimerService.registerParticipant(roomId, user.id);
+        TimerService.registerParticipant(resolvedRoomId, user.id);
 
         // Update lastActiveAt
         await prisma.roomMember.updateMany({
-          where: { roomId, userId: user.id },
+          where: { roomId: resolvedRoomId, userId: user.id },
           data: { lastActiveAt: new Date() },
         });
 
         // Notify other participants
-        socket.to(`room:${roomId}`).emit(SOCKET_EVENTS.SERVER.ROOM_PARTICIPANT_JOINED, {
+        socket.to(`room:${resolvedRoomId}`).emit(SOCKET_EVENTS.SERVER.ROOM_PARTICIPANT_JOINED, {
           user,
-          roomId,
+          roomId: resolvedRoomId,
           timestamp: new Date().toISOString(),
         });
 
         // Broadcast live ephemeral participant join activity
-        RoomActivityService.broadcastActivity(roomId, {
+        RoomActivityService.broadcastActivity(resolvedRoomId, {
           userId: user.id,
           userName: user.name,
           action: 'MEMBER_JOINED',
@@ -157,26 +162,31 @@ export function setupSocketServer(httpServer: HttpServer): SocketIOServer {
         const { roomId } = data;
         if (!roomId) return;
 
-        socket.leave(`room:${roomId}`);
-        socket.data.joinedRooms.delete(roomId);
-        TimerService.unregisterParticipant(roomId, user.id);
+        const room = await RoomService.findRoomByIdOrCode(roomId);
+        const targetRoomId = room ? room.id : roomId;
 
-        socket.to(`room:${roomId}`).emit(SOCKET_EVENTS.SERVER.ROOM_PARTICIPANT_LEFT, {
+        socket.leave(`room:${roomId}`);
+        socket.leave(`room:${targetRoomId}`);
+        socket.data.joinedRooms.delete(roomId);
+        socket.data.joinedRooms.delete(targetRoomId);
+        TimerService.unregisterParticipant(targetRoomId, user.id);
+
+        socket.to(`room:${targetRoomId}`).emit(SOCKET_EVENTS.SERVER.ROOM_PARTICIPANT_LEFT, {
           userId: user.id,
           userName: user.name,
-          roomId,
+          roomId: targetRoomId,
         });
 
         // Broadcast live ephemeral participant leave activity
-        RoomActivityService.broadcastActivity(roomId, {
+        RoomActivityService.broadcastActivity(targetRoomId, {
           userId: user.id,
           userName: user.name,
           action: 'MEMBER_LEFT',
           details: `${user.name} left the room`,
         });
 
-        if (TimerService.getActiveParticipants(roomId).length === 0) {
-          RoomActivityService.clearRoom(roomId);
+        if (TimerService.getActiveParticipants(targetRoomId).length === 0) {
+          RoomActivityService.clearRoom(targetRoomId);
         }
       } catch {
         // Silently handled without console exposure

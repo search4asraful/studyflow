@@ -273,6 +273,7 @@ export default function AnalyticsPage() {
                       <XAxis dataKey="day" stroke="var(--text-muted)" fontSize={11} tickLine={false} />
                       <YAxis stroke="var(--text-muted)" fontSize={11} tickLine={false} unit="m" />
                       <Tooltip
+                        cursor={false}
                         contentStyle={{
                           backgroundColor: 'var(--bg-surface)',
                           border: '1px solid var(--border-base)',
@@ -285,7 +286,12 @@ export default function AnalyticsPage() {
                         itemStyle={{ color: 'var(--accent)' }}
                         formatter={(val: any) => [`${val} minutes`, 'Focus Time']}
                       />
-                      <Bar dataKey="focusMinutes" fill="var(--accent)" radius={[8, 8, 0, 0]} />
+                      <Bar
+                        dataKey="focusMinutes"
+                        fill="var(--accent)"
+                        radius={[8, 8, 0, 0]}
+                        activeBar={{ fill: 'var(--accent-hover, #5084c3)' }}
+                      />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>

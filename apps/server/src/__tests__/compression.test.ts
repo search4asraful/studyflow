@@ -78,4 +78,27 @@ describe('nativeCompression Middleware', () => {
     const unzipped = zlib.gunzipSync(capturedBuffer!).toString('utf-8');
     expect(JSON.parse(unzipped)).toEqual(JSON.parse(largePayload));
   });
+
+  it('should safely serialize small JSON objects without recursion or stack overflow', () => {
+    const req: any = { headers: { 'accept-encoding': 'gzip, deflate' } };
+    let capturedSend: any;
+    const res: any = {
+      send: vi.fn().mockImplementation((body) => {
+        capturedSend = body;
+      }),
+      getHeader: vi.fn().mockReturnValue(null),
+      setHeader: vi.fn(),
+      removeHeader: vi.fn(),
+    };
+    const next = vi.fn();
+
+    nativeCompression(req, res, next);
+    expect(next).toHaveBeenCalled();
+
+    const smallObject = { success: true, message: 'Left room successfully' };
+    res.send(smallObject);
+
+    expect(capturedSend).toBe(JSON.stringify(smallObject));
+    expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'application/json; charset=utf-8');
+  });
 });

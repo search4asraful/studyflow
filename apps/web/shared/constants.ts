@@ -39,6 +39,7 @@ export const SOCKET_EVENTS = {
     TASK_DELETED: 'task:deleted',
     ROOM_ACTIVITY: 'room:activity',
     ROOM_ERROR: 'room:error',
+    ROOM_DELETED: 'room:deleted',
     MEMBER_ROLE_UPDATED: 'room:member-role-updated',
   },
 } as const;

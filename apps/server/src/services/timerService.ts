@@ -52,13 +52,22 @@ export class TimerService {
     return participants ? Array.from(participants) : [];
   }
 
+  static cleanupRoom(roomId: string) {
+    this.activeRunningRooms.delete(roomId);
+    this.activeTimerMemory.delete(roomId);
+    this.roomParticipants.delete(roomId);
+    RoomActivityService.clearRoom(roomId);
+    if (this.io) {
+      this.io.to(`room:${roomId}`).emit(SOCKET_EVENTS.SERVER.ROOM_DELETED, { roomId });
+    }
+  }
+
   /**
    * Initializes timer states on server startup, restoring any running timers
    */
   static async initializeFromDatabase() {
     const runningTimers = await prisma.timerState.findMany({
       where: { status: TimerStatus.RUNNING },
-      include: { room: true },
     });
 
     const now = Date.now();
@@ -111,7 +120,6 @@ export class TimerService {
 
     let timerState = await prisma.timerState.findUnique({
       where: { roomId },
-      include: { room: true },
     });
 
     if (!timerState) {
@@ -130,7 +138,6 @@ export class TimerService {
           totalPhaseDuration: room.focusDuration,
           currentCycle: 1,
         },
-        include: { room: true },
       });
     }
 

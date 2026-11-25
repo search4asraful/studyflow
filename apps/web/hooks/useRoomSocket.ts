@@ -28,9 +28,10 @@ export function useRoomSocket(roomId: string | undefined) {
 
   const localTickerRef = useRef<NodeJS.Timeout | null>(null);
   const heartbeatRef = useRef<NodeJS.Timeout | null>(null);
+  const isLeavingRef = useRef(false);
 
   const joinRoom = useCallback(() => {
-    if (!roomId) return;
+    if (!roomId || isLeavingRef.current) return;
     const socket = getSocket();
 
     if (!socket.connected) {
@@ -41,6 +42,7 @@ export function useRoomSocket(roomId: string | undefined) {
       SOCKET_EVENTS.CLIENT.ROOM_JOIN,
       { roomId },
       (response: { success: boolean; data?: any; error?: string }) => {
+        if (isLeavingRef.current) return;
         if (response?.success && response.data) {
           setRoomState(response.data);
           if (response.data.timerState) {
@@ -137,7 +139,16 @@ export function useRoomSocket(roomId: string | undefined) {
     };
 
     const onRoomError = (data: { message: string }) => {
+      if (isLeavingRef.current) return;
       toast.error(data.message);
+    };
+
+    const onRoomDeleted = () => {
+      if (isLeavingRef.current) return;
+      isLeavingRef.current = true;
+      toast.info('Study room was closed or deleted.');
+      useRoomStore.getState().clearRoom();
+      window.location.href = '/rooms';
     };
 
     socket.on(SOCKET_EVENTS.SERVER.ROOM_STATE, onRoomState);
@@ -152,6 +163,7 @@ export function useRoomSocket(roomId: string | undefined) {
     socket.on(SOCKET_EVENTS.SERVER.ROOM_ACTIVITY, onRoomActivity);
     socket.on(SOCKET_EVENTS.SERVER.MEMBER_ROLE_UPDATED, onMemberRoleUpdated);
     socket.on(SOCKET_EVENTS.SERVER.ROOM_ERROR, onRoomError);
+    socket.on(SOCKET_EVENTS.SERVER.ROOM_DELETED, onRoomDeleted);
 
     // Local 1s countdown ticker for buttery-smooth client experience
     localTickerRef.current = setInterval(() => {
@@ -160,6 +172,7 @@ export function useRoomSocket(roomId: string | undefined) {
 
     // Heartbeat every 20 seconds to keep connection alive and update online status
     heartbeatRef.current = setInterval(() => {
+      if (isLeavingRef.current) return;
       if (socket.connected) {
         socket.emit(SOCKET_EVENTS.CLIENT.PARTICIPANT_HEARTBEAT, { roomId });
       }
@@ -167,11 +180,12 @@ export function useRoomSocket(roomId: string | undefined) {
 
     // Fast authoritative reconciliation when user switches back to this tab
     const handleFocusAndVisibility = () => {
+      if (isLeavingRef.current) return;
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        joinRoom();
-        // Also fetch authoritative timer state directly in background for instant sync
+        // Fast authoritative timer reconciliation on tab switch (without redundant room join)
         apiRequest<AuthoritativeTimerState>(`/rooms/${roomId}/timer`)
           .then((timerState) => {
+            if (isLeavingRef.current) return;
             if (timerState) {
               syncAuthoritativeState(timerState);
             }
@@ -181,6 +195,7 @@ export function useRoomSocket(roomId: string | undefined) {
     };
 
     const handleCrossTabTimerSync = (e: Event) => {
+      if (isLeavingRef.current) return;
       const customEvent = e as CustomEvent<{ roomId: string; timerState: AuthoritativeTimerState }>;
       if (customEvent.detail?.roomId === roomId && customEvent.detail?.timerState) {
         syncAuthoritativeState(customEvent.detail.timerState);
@@ -221,6 +236,7 @@ export function useRoomSocket(roomId: string | undefined) {
       socket.off(SOCKET_EVENTS.SERVER.ROOM_ACTIVITY, onRoomActivity);
       socket.off(SOCKET_EVENTS.SERVER.MEMBER_ROLE_UPDATED, onMemberRoleUpdated);
       socket.off(SOCKET_EVENTS.SERVER.ROOM_ERROR, onRoomError);
+      socket.off(SOCKET_EVENTS.SERVER.ROOM_DELETED, onRoomDeleted);
     };
   }, [
     roomId,
@@ -495,6 +511,21 @@ export function useRoomSocket(roomId: string | undefined) {
     socket.emit(SOCKET_EVENTS.CLIENT.MEMBER_ROLE_UPDATE, { roomId, targetUserId, newRole });
   };
 
+  const leaveRoom = useCallback(async () => {
+    if (!roomId) return;
+    isLeavingRef.current = true;
+
+    if (localTickerRef.current) clearInterval(localTickerRef.current);
+    if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+
+    const socket = getSocket();
+    if (socket.connected) {
+      socket.emit(SOCKET_EVENTS.CLIENT.ROOM_LEAVE, { roomId });
+    }
+
+    await apiRequest(`/rooms/${roomId}/leave`, { method: 'POST' });
+  }, [roomId]);
+
   return {
     startTimer,
     pauseTimer,
@@ -507,5 +538,6 @@ export function useRoomSocket(roomId: string | undefined) {
     unassignTask: emitUnassignTask,
     sendChatMessage: emitChatMessage,
     updateMemberRole: emitUpdateMemberRole,
+    leaveRoom,
   };
 }

@@ -136,9 +136,25 @@ export class RoomService {
     }));
   }
 
-  static async getRoomDetails(roomId: string, userId: string): Promise<RoomStatePayload> {
-    const room = await prisma.studyRoom.findUnique({
-      where: { id: roomId },
+  static async findRoomByIdOrCode(roomIdOrCode: string) {
+    return prisma.studyRoom.findFirst({
+      where: {
+        OR: [
+          { id: roomIdOrCode },
+          { inviteCode: roomIdOrCode.toUpperCase() },
+        ],
+      },
+    });
+  }
+
+  static async getRoomDetails(roomIdOrCode: string, userId: string): Promise<RoomStatePayload> {
+    const room = await prisma.studyRoom.findFirst({
+      where: {
+        OR: [
+          { id: roomIdOrCode },
+          { inviteCode: roomIdOrCode.toUpperCase() },
+        ],
+      },
       include: {
         owner: {
           select: {
@@ -197,31 +213,64 @@ export class RoomService {
       throw new NotFoundError('Study room not found');
     }
 
+    const roomId = room.id;
+
     // Verify membership
     let member = room.members.find((m) => m.userId === userId);
     if (!member && !room.isPrivate) {
-      // Auto-join if public room
-      const newMember = await prisma.roomMember.create({
-        data: {
-          roomId,
-          userId,
-          role: RoomRole.MEMBER,
-        },
-        include: {
-          user: {
-            select: {
-              id: true,
-              email: true,
-              name: true,
-              avatarUrl: true,
-              bio: true,
-              createdAt: true,
+      try {
+        // Auto-join if public room using upsert to prevent unique constraint race conditions
+        const newMember = await prisma.roomMember.upsert({
+          where: {
+            roomId_userId: { roomId, userId },
+          },
+          create: {
+            roomId,
+            userId,
+            role: RoomRole.MEMBER,
+          },
+          update: {
+            lastActiveAt: new Date(),
+          },
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                name: true,
+                avatarUrl: true,
+                bio: true,
+                createdAt: true,
+              },
             },
           },
-        },
-      });
-      room.members.push(newMember as any);
-      member = newMember as any;
+        });
+        room.members.push(newMember as any);
+        member = newMember as any;
+      } catch {
+        // If a concurrent join or race condition occurred, safely read existing membership
+        const existing = await prisma.roomMember.findUnique({
+          where: {
+            roomId_userId: { roomId, userId },
+          },
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                name: true,
+                avatarUrl: true,
+                bio: true,
+                createdAt: true,
+              },
+            },
+          },
+        });
+        if (existing) {
+          room.members.push(existing as any);
+          member = existing as any;
+        }
+      }
     } else if (!member) {
       throw new ForbiddenError('You are not a member of this private room');
     }
@@ -352,11 +401,10 @@ export class RoomService {
   }
 
   static async leaveRoom(roomId: string, userId: string): Promise<void> {
-    const room = await prisma.studyRoom.findUnique({
-      where: { id: roomId },
-    });
+    const room = await this.findRoomByIdOrCode(roomId);
 
-    if (!room) throw new NotFoundError('Room not found');
+    // If the room doesn't exist, the user is already not a member
+    if (!room) return;
 
     if (room.ownerId === userId) {
       throw new BadRequestError(
@@ -364,9 +412,11 @@ export class RoomService {
       );
     }
 
-    await prisma.roomMember.delete({
+    // Idempotent delete: deleteMany will not throw P2025 error if record is not found
+    await prisma.roomMember.deleteMany({
       where: {
-        roomId_userId: { roomId, userId },
+        roomId: room.id,
+        userId,
       },
     });
   }
@@ -376,9 +426,7 @@ export class RoomService {
     userId: string,
     input: UpdateRoomInput
   ): Promise<StudyRoom> {
-    const room = await prisma.studyRoom.findUnique({
-      where: { id: roomId },
-    });
+    const room = await this.findRoomByIdOrCode(roomId);
 
     if (!room) throw new NotFoundError('Room not found');
 
@@ -387,7 +435,7 @@ export class RoomService {
     }
 
     const updated = await prisma.studyRoom.update({
-      where: { id: roomId },
+      where: { id: room.id },
       data: {
         ...(input.name ? { name: input.name } : {}),
         ...(input.description !== undefined ? { description: input.description } : {}),
@@ -434,9 +482,7 @@ export class RoomService {
   }
 
   static async deleteRoom(roomId: string, userId: string): Promise<void> {
-    const room = await prisma.studyRoom.findUnique({
-      where: { id: roomId },
-    });
+    const room = await this.findRoomByIdOrCode(roomId);
 
     if (!room) throw new NotFoundError('Room not found');
 
@@ -444,10 +490,21 @@ export class RoomService {
       throw new ForbiddenError('Only the room owner can delete the room');
     }
 
-    await prisma.studyRoom.delete({
-      where: { id: roomId },
-    });
-    RoomActivityService.clearRoom(roomId);
+    const targetRoomId = room.id;
+
+    // Explicit cascading delete in transaction to guarantee zero foreign key violations
+    // and zero orphaned records, regardless of whether the Postgres DB has cascades configured.
+    await prisma.$transaction([
+      prisma.task.deleteMany({ where: { roomId: targetRoomId } }),
+      prisma.pomodoroRecord.deleteMany({ where: { roomId: targetRoomId } }),
+      prisma.timerState.deleteMany({ where: { roomId: targetRoomId } }),
+      prisma.studySession.deleteMany({ where: { roomId: targetRoomId } }),
+      prisma.roomMember.deleteMany({ where: { roomId: targetRoomId } }),
+      prisma.studyRoom.delete({ where: { id: targetRoomId } }),
+    ]);
+
+    TimerService.cleanupRoom(targetRoomId);
+    RoomActivityService.clearRoom(targetRoomId);
   }
 
   static async updateMemberRole(
@@ -456,9 +513,7 @@ export class RoomService {
     newRole: RoomRole,
     requestingUserId: string
   ): Promise<{ previousRole: RoomRole; newRole: RoomRole; newOwnerId?: string }> {
-    const room = await prisma.studyRoom.findUnique({
-      where: { id: roomId },
-    });
+    const room = await this.findRoomByIdOrCode(roomId);
 
     if (!room) throw new NotFoundError('Room not found');
 
@@ -472,7 +527,7 @@ export class RoomService {
 
     const targetMember = await prisma.roomMember.findUnique({
       where: {
-        roomId_userId: { roomId, userId: targetUserId },
+        roomId_userId: { roomId: room.id, userId: targetUserId },
       },
     });
 
@@ -486,15 +541,15 @@ export class RoomService {
       // Transfer room ownership to target user and demote old owner to MODERATOR
       await prisma.$transaction([
         prisma.studyRoom.update({
-          where: { id: roomId },
+          where: { id: room.id },
           data: { ownerId: targetUserId },
         }),
         prisma.roomMember.update({
-          where: { roomId_userId: { roomId, userId: targetUserId } },
+          where: { roomId_userId: { roomId: room.id, userId: targetUserId } },
           data: { role: RoomRole.OWNER },
         }),
         prisma.roomMember.update({
-          where: { roomId_userId: { roomId, userId: requestingUserId } },
+          where: { roomId_userId: { roomId: room.id, userId: requestingUserId } },
           data: { role: RoomRole.MODERATOR },
         }),
       ]);
@@ -507,7 +562,7 @@ export class RoomService {
     } else {
       await prisma.roomMember.update({
         where: {
-          roomId_userId: { roomId, userId: targetUserId },
+          roomId_userId: { roomId: room.id, userId: targetUserId },
         },
         data: { role: newRole },
       });
@@ -524,14 +579,12 @@ export class RoomService {
     targetUserId: string,
     requestingUserId: string
   ): Promise<void> {
-    const room = await prisma.studyRoom.findUnique({
-      where: { id: roomId },
-    });
+    const room = await this.findRoomByIdOrCode(roomId);
 
     if (!room) throw new NotFoundError('Room not found');
 
     const requesterMember = await prisma.roomMember.findUnique({
-      where: { roomId_userId: { roomId, userId: requestingUserId } },
+      where: { roomId_userId: { roomId: room.id, userId: requestingUserId } },
     });
 
     if (!requesterMember || requesterMember.role === RoomRole.MEMBER) {
@@ -542,9 +595,10 @@ export class RoomService {
       throw new BadRequestError('Cannot kick the room owner');
     }
 
-    await prisma.roomMember.delete({
+    await prisma.roomMember.deleteMany({
       where: {
-        roomId_userId: { roomId, userId: targetUserId },
+        roomId: room.id,
+        userId: targetUserId,
       },
     });
   }

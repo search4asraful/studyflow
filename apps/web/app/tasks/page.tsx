@@ -142,31 +142,6 @@ export default function MyTasksPage() {
     }
   };
 
-  const handleDeleteTask = async (taskId: string) => {
-    const task = tasks.find((t) => t.id === taskId);
-    if (!window.confirm(`Are you sure you want to delete "${task?.title || 'this task'}"?`)) {
-      return;
-    }
-    const previousTasks = [...tasks];
-
-    // 1. Instant optimistic deletion
-    setTasks((prev) => prev.filter((t) => t.id !== taskId));
-    mutateApiCache<Task[]>('/tasks/my', (cached) =>
-      cached ? cached.filter((t) => t.id !== taskId) : []
-    );
-    toast.success('Task deleted');
-
-    // 2. Background sync with rollback
-    try {
-      await apiRequest(`/tasks/${taskId}`, { method: 'DELETE' });
-      invalidateApiCache('/analytics/summary');
-    } catch (err: any) {
-      setTasks(previousTasks);
-      mutateApiCache<Task[]>('/tasks/my', () => previousTasks);
-      toast.error(err.message || 'Failed to delete task');
-    }
-  };
-
   const handleCreateTask = async (taskData: any) => {
     const targetRoomId = taskData.roomId || rooms[0]?.id;
     if (!targetRoomId) {
@@ -292,9 +267,9 @@ export default function MyTasksPage() {
             <WorkspaceKanban
               tasks={tasks}
               onUpdateTask={handleUpdateTask}
-              onDeleteTask={handleDeleteTask}
               onOpenCreateModal={rooms.length > 0 ? () => setIsCreateModalOpen(true) : undefined}
               showRoomLink={true}
+              showDelete={false}
             />
           </div>
         ) : (
