@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { getSocket } from '../lib/socket';
 import { useRoomStore } from '../stores/roomStore';
 import { useTimerStore } from '../stores/timerStore';
 import { useAuthStore } from '../stores/authStore';
+import { broadcastTimerSync } from '../lib/tabSync';
 import { SOCKET_EVENTS, AuthoritativeTimerState, Task, RoomActivity, RoomRole } from '@studyflow/shared';
 import { toast } from 'sonner';
+import { playCompletionChime } from '../lib/audio';
 
 import { apiRequest } from '../lib/api';
 
@@ -27,37 +29,54 @@ export function useRoomSocket(roomId: string | undefined) {
   const localTickerRef = useRef<NodeJS.Timeout | null>(null);
   const heartbeatRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
+  const joinRoom = useCallback(() => {
     if (!roomId) return;
-
     const socket = getSocket();
 
     if (!socket.connected) {
       socket.connect();
     }
 
-    // Join room event
     socket.emit(
       SOCKET_EVENTS.CLIENT.ROOM_JOIN,
       { roomId },
       (response: { success: boolean; data?: any; error?: string }) => {
         if (response?.success && response.data) {
           setRoomState(response.data);
-          syncAuthoritativeState(response.data.timerState);
+          if (response.data.timerState) {
+            syncAuthoritativeState(response.data.timerState);
+            broadcastTimerSync(roomId, response.data.timerState);
+          }
         } else if (response?.error) {
           toast.error(response.error);
         }
       }
     );
+  }, [roomId, setRoomState, syncAuthoritativeState]);
+
+  useEffect(() => {
+    if (!roomId) return;
+
+    const socket = getSocket();
+
+    // 1. Initial room join
+    joinRoom();
+
+    // 2. Re-join room automatically on socket connection / reconnection
+    socket.on('connect', joinRoom);
 
     // Socket Event Listeners
     const onRoomState = (payload: any) => {
       setRoomState(payload);
-      syncAuthoritativeState(payload.timerState);
+      if (payload.timerState) {
+        syncAuthoritativeState(payload.timerState);
+        broadcastTimerSync(roomId, payload.timerState);
+      }
     };
 
     const onTimerState = (state: AuthoritativeTimerState) => {
       syncAuthoritativeState(state);
+      broadcastTimerSync(roomId, state);
     };
 
     const onTimerTick = (data: { remainingSeconds: number; serverTimestamp: number }) => {
@@ -70,6 +89,8 @@ export function useRoomSocket(roomId: string | undefined) {
       timerState: AuthoritativeTimerState;
     }) => {
       syncAuthoritativeState(data.timerState);
+      broadcastTimerSync(roomId, data.timerState);
+      playCompletionChime();
       toast.success(
         `Phase changed: ${data.previousPhase.replace('_', ' ')} completed! Starting ${data.newPhase.replace('_', ' ')}.`
       );
@@ -144,10 +165,48 @@ export function useRoomSocket(roomId: string | undefined) {
       }
     }, 20000);
 
+    // Fast authoritative reconciliation when user switches back to this tab
+    const handleFocusAndVisibility = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        joinRoom();
+        // Also fetch authoritative timer state directly in background for instant sync
+        apiRequest<AuthoritativeTimerState>(`/rooms/${roomId}/timer`)
+          .then((timerState) => {
+            if (timerState) {
+              syncAuthoritativeState(timerState);
+            }
+          })
+          .catch(() => {});
+      }
+    };
+
+    const handleCrossTabTimerSync = (e: Event) => {
+      const customEvent = e as CustomEvent<{ roomId: string; timerState: AuthoritativeTimerState }>;
+      if (customEvent.detail?.roomId === roomId && customEvent.detail?.timerState) {
+        syncAuthoritativeState(customEvent.detail.timerState);
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', handleFocusAndVisibility);
+      window.addEventListener('studyflow:socket-reconnected', handleFocusAndVisibility);
+      window.addEventListener('studyflow:tab-claimed', handleFocusAndVisibility);
+      window.addEventListener('studyflow:timer-sync', handleCrossTabTimerSync);
+      document.addEventListener('visibilitychange', handleFocusAndVisibility);
+    }
+
     return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('focus', handleFocusAndVisibility);
+        window.removeEventListener('studyflow:socket-reconnected', handleFocusAndVisibility);
+        window.removeEventListener('studyflow:tab-claimed', handleFocusAndVisibility);
+        window.removeEventListener('studyflow:timer-sync', handleCrossTabTimerSync);
+        document.removeEventListener('visibilitychange', handleFocusAndVisibility);
+      }
       if (localTickerRef.current) clearInterval(localTickerRef.current);
       if (heartbeatRef.current) clearInterval(heartbeatRef.current);
 
+      socket.off('connect', joinRoom);
       socket.emit(SOCKET_EVENTS.CLIENT.ROOM_LEAVE, { roomId });
 
       socket.off(SOCKET_EVENTS.SERVER.ROOM_STATE, onRoomState);
@@ -165,6 +224,7 @@ export function useRoomSocket(roomId: string | undefined) {
     };
   }, [
     roomId,
+    joinRoom,
     setRoomState,
     addMember,
     updateMemberOnlineStatus,
@@ -178,25 +238,164 @@ export function useRoomSocket(roomId: string | undefined) {
     localTick,
   ]);
 
-  // Actions wrapped in socket emissions with optimistic response
+  // Actions wrapped in socket emissions with optimistic response + automatic REST fallback
   const startTimer = () => {
+    if (!roomId) return;
+    useTimerStore.setState({ status: 'RUNNING' });
+
     const socket = getSocket();
-    socket.emit(SOCKET_EVENTS.CLIENT.TIMER_START, { roomId });
+    let completed = false;
+
+    const applyState = (state: AuthoritativeTimerState) => {
+      if (completed) return;
+      completed = true;
+      syncAuthoritativeState(state);
+      broadcastTimerSync(roomId, state);
+    };
+
+    if (socket.connected) {
+      socket.emit(SOCKET_EVENTS.CLIENT.TIMER_START, { roomId }, (response: any) => {
+        if (response?.success && response.data) {
+          applyState(response.data);
+        } else if (response?.error) {
+          toast.error(response.error);
+        }
+      });
+    }
+
+    setTimeout(async () => {
+      if (!completed) {
+        try {
+          const state = await apiRequest<AuthoritativeTimerState>(`/rooms/${roomId}/timer/start`, {
+            method: 'POST',
+          });
+          applyState(state);
+        } catch (err: any) {
+          if (!completed) {
+            toast.error(err.message || 'Failed to start timer');
+          }
+        }
+      }
+    }, socket.connected ? 300 : 0);
   };
 
   const pauseTimer = () => {
+    if (!roomId) return;
+    useTimerStore.setState({ status: 'PAUSED' });
+
     const socket = getSocket();
-    socket.emit(SOCKET_EVENTS.CLIENT.TIMER_PAUSE, { roomId });
+    let completed = false;
+
+    const applyState = (state: AuthoritativeTimerState) => {
+      if (completed) return;
+      completed = true;
+      syncAuthoritativeState(state);
+      broadcastTimerSync(roomId, state);
+    };
+
+    if (socket.connected) {
+      socket.emit(SOCKET_EVENTS.CLIENT.TIMER_PAUSE, { roomId }, (response: any) => {
+        if (response?.success && response.data) {
+          applyState(response.data);
+        } else if (response?.error) {
+          toast.error(response.error);
+        }
+      });
+    }
+
+    setTimeout(async () => {
+      if (!completed) {
+        try {
+          const state = await apiRequest<AuthoritativeTimerState>(`/rooms/${roomId}/timer/pause`, {
+            method: 'POST',
+          });
+          applyState(state);
+        } catch (err: any) {
+          if (!completed) {
+            toast.error(err.message || 'Failed to pause timer');
+          }
+        }
+      }
+    }, socket.connected ? 300 : 0);
   };
 
   const resumeTimer = () => {
+    if (!roomId) return;
+    useTimerStore.setState({ status: 'RUNNING' });
+
     const socket = getSocket();
-    socket.emit(SOCKET_EVENTS.CLIENT.TIMER_RESUME, { roomId });
+    let completed = false;
+
+    const applyState = (state: AuthoritativeTimerState) => {
+      if (completed) return;
+      completed = true;
+      syncAuthoritativeState(state);
+      broadcastTimerSync(roomId, state);
+    };
+
+    if (socket.connected) {
+      socket.emit(SOCKET_EVENTS.CLIENT.TIMER_RESUME, { roomId }, (response: any) => {
+        if (response?.success && response.data) {
+          applyState(response.data);
+        } else if (response?.error) {
+          toast.error(response.error);
+        }
+      });
+    }
+
+    setTimeout(async () => {
+      if (!completed) {
+        try {
+          const state = await apiRequest<AuthoritativeTimerState>(`/rooms/${roomId}/timer/resume`, {
+            method: 'POST',
+          });
+          applyState(state);
+        } catch (err: any) {
+          if (!completed) {
+            toast.error(err.message || 'Failed to resume timer');
+          }
+        }
+      }
+    }, socket.connected ? 300 : 0);
   };
 
   const skipPhase = (targetPhase?: string) => {
+    if (!roomId) return;
     const socket = getSocket();
-    socket.emit(SOCKET_EVENTS.CLIENT.TIMER_SKIP, { roomId, targetPhase });
+    let completed = false;
+
+    const applyState = (state: AuthoritativeTimerState) => {
+      if (completed) return;
+      completed = true;
+      syncAuthoritativeState(state);
+      broadcastTimerSync(roomId, state);
+    };
+
+    if (socket.connected) {
+      socket.emit(SOCKET_EVENTS.CLIENT.TIMER_SKIP, { roomId, targetPhase }, (response: any) => {
+        if (response?.success && response.data) {
+          applyState(response.data);
+        } else if (response?.error) {
+          toast.error(response.error);
+        }
+      });
+    }
+
+    setTimeout(async () => {
+      if (!completed) {
+        try {
+          const state = await apiRequest<AuthoritativeTimerState>(`/rooms/${roomId}/timer/skip`, {
+            method: 'POST',
+            body: JSON.stringify({ targetPhase }),
+          });
+          applyState(state);
+        } catch (err: any) {
+          if (!completed) {
+            toast.error(err.message || 'Failed to skip phase');
+          }
+        }
+      }
+    }, socket.connected ? 300 : 0);
   };
 
   const emitCreateTask = (taskData: any) => {

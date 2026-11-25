@@ -10,18 +10,22 @@ export function getSocket(): Socket {
       withCredentials: true,
       autoConnect: false,
       reconnection: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 20,
+      reconnectionDelay: 500,
+      reconnectionDelayMax: 3000,
       transports: ['websocket', 'polling'],
     });
 
     socket.on('connect', () => {
-      // Connected to server
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('studyflow:socket-connected'));
+      }
     });
 
     socket.on('disconnect', (_reason) => {
-      // Disconnected from server
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('studyflow:socket-disconnected'));
+      }
     });
 
     socket.on('connect_error', () => {
@@ -30,4 +34,28 @@ export function getSocket(): Socket {
   }
 
   return socket;
+}
+
+/**
+ * Disconnect socket when tab is superseded or backgrounded.
+ * Frees precious memory and socket handles on single-core <100MB RAM server.
+ */
+export function disconnectSocket(): void {
+  if (socket && socket.connected) {
+    socket.disconnect();
+  }
+}
+
+/**
+ * Reconnect socket when tab becomes active again.
+ */
+export function reconnectSocket(): void {
+  if (socket) {
+    if (!socket.connected) {
+      socket.connect();
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('studyflow:socket-reconnected'));
+    }
+  }
 }

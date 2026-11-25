@@ -4,7 +4,12 @@ import React, { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AppShell } from '../../components/layout/AppShell';
-import { apiRequest } from '../../lib/api';
+import {
+  apiRequest,
+  cachedApiRequest,
+  invalidateApiCache,
+  subscribeToRevalidation,
+} from '../../lib/api';
 import { StudyRoom } from '@studyflow/shared';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -36,17 +41,32 @@ function RoomsContent() {
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
+
     async function loadRooms() {
       try {
-        const data = await apiRequest<StudyRoom[]>('/rooms');
-        setRooms(data);
+        const data = await cachedApiRequest<StudyRoom[]>('/rooms');
+        if (active) {
+          setRooms(data);
+          setLoading(false);
+        }
       } catch (err: any) {
-        toast.error(err.message || 'Failed to fetch rooms');
-      } finally {
-        setLoading(false);
+        if (active) {
+          toast.error(err.message || 'Failed to fetch rooms');
+          setLoading(false);
+        }
       }
     }
     loadRooms();
+
+    const unsub = subscribeToRevalidation<StudyRoom[]>('/rooms', (data) => {
+      if (active && data) setRooms(data);
+    });
+
+    return () => {
+      active = false;
+      unsub();
+    };
   }, []);
 
   const handleJoinByCode = async (e: React.FormEvent) => {
@@ -59,6 +79,7 @@ function RoomsContent() {
         method: 'POST',
         body: JSON.stringify({ inviteCode: inviteCode.trim().toUpperCase() }),
       });
+      invalidateApiCache('/rooms');
       toast.success(`Joined room: ${room.name}!`);
       router.push(`/rooms/${room.id}`);
     } catch (err: any) {

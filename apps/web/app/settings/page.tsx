@@ -14,11 +14,14 @@ import {
   VolumeX,
   Play,
   CheckCircle2,
+  Target,
 } from 'lucide-react';
 import {
   getTaskAudioSettings,
   saveTaskAudioSettings,
   playTaskCompletionSound,
+  playTimerCycleWarning,
+  playCompletionChime,
   TaskSoundStyle,
   TaskAudioSettings,
   DEFAULT_TASK_AUDIO_SETTINGS,
@@ -192,6 +195,30 @@ export default function SettingsPage() {
                 </button>
               ))}
             </div>
+
+            {/* Timer Cycle Countdown & Alarm Clock Completion Audio Preview */}
+            <div className="pt-3 border-t border-border/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <span className="text-xs font-semibold text-foreground block">
+                  Timer Cycle Alarm Clock &amp; Countdown Audio
+                </span>
+                <span className="text-[11px] text-foreground-secondary block mt-0.5">
+                  Plays gentle countdown pulses 2–3s before cycle ends and a digital alarm clock sound upon cycle completion.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  playTimerCycleWarning();
+                  setTimeout(() => playCompletionChime(), 2600);
+                  toast.info('Auditioning 2-3s countdown warning & alarm clock completion sound...');
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-surface-subtle hover:bg-surface-elevated text-xs font-semibold text-accent hover:border-accent/40 transition-all cursor-pointer shrink-0 self-start sm:self-auto shadow-2xs"
+              >
+                <Play className="w-3 h-3 fill-current" />
+                <span>Audition Alarm Clock</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -223,30 +250,150 @@ export default function SettingsPage() {
               />
             </div>
 
-            {/* Daily Goal with Live Time Converter */}
-            <div className="space-y-2 pt-2">
+            {/* Daily Focus Target Section with Visual Wheel & Calibrated Slider */}
+            <div className="space-y-3 pt-2">
               <div className="flex items-center justify-between">
-                <label className="block text-xs font-medium text-foreground-secondary">
-                  Daily Focus Target
-                </label>
-                <span className="text-xs font-mono font-bold text-accent">
+                <div className="flex items-center gap-2">
+                  <Target className="w-4 h-4 text-accent" />
+                  <label className="text-xs font-semibold text-foreground">
+                    Daily Focus Target
+                  </label>
+                </div>
+                <span className="text-xs font-mono font-bold text-accent bg-accent/10 px-2.5 py-0.5 rounded-md border border-accent/20">
                   {formatMinutes(dailyGoal)} ({dailyGoal} mins)
                 </span>
               </div>
-              <input
-                type="range"
-                min="15"
-                max="480"
-                step="15"
-                value={dailyGoal}
-                onChange={(e) => setDailyGoal(Number(e.target.value))}
-                className="w-full h-2 bg-surface-subtle rounded-lg appearance-none cursor-pointer accent-accent"
-              />
-              <div className="flex justify-between text-[10px] font-mono text-foreground-muted">
-                <span>15m</span>
-                <span>2h (120m)</span>
-                <span>4h (240m)</span>
-                <span>8h (480m)</span>
+
+              {/* Target Dial & Slider Card */}
+              <div className="p-4 rounded-xl bg-surface-subtle/80 border border-border/70 space-y-4">
+                {/* Visual Target Wheel + Session Equivalent Stats */}
+                <div className="flex items-center gap-4">
+                  {/* Circular Target Wheel */}
+                  <div className="relative w-16 h-16 shrink-0 flex items-center justify-center">
+                    <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                      <path
+                        className="text-border-subtle"
+                        strokeWidth="3.5"
+                        stroke="currentColor"
+                        fill="none"
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      />
+                      <path
+                        className="text-accent transition-all duration-300 ease-out"
+                        strokeDasharray={`${Math.min(100, Math.round((dailyGoal / 480) * 100))}, 100`}
+                        strokeWidth="3.5"
+                        strokeLinecap="round"
+                        stroke="currentColor"
+                        fill="none"
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                      <span className="text-[11px] font-mono font-bold text-foreground leading-none">
+                        {Math.min(100, Math.round((dailyGoal / 480) * 100))}%
+                      </span>
+                      <span className="text-[8px] font-mono text-foreground-muted leading-tight mt-0.5">
+                        of 8h
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Target Description & Presets */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold text-foreground">
+                        {formatMinutes(dailyGoal)} daily commitment
+                      </p>
+                      <span className="text-[11px] font-mono text-foreground-muted">
+                        ~{Math.round((dailyGoal / 25) * 10) / 10} sessions
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-foreground-secondary mt-0.5">
+                      Sets your benchmark for daily focus rings across the dashboard and analytics.
+                    </p>
+
+                    {/* Quick Preset Buttons */}
+                    <div className="flex flex-wrap gap-1.5 mt-2.5">
+                      {[
+                        { label: '30m', mins: 30 },
+                        { label: '1h', mins: 60 },
+                        { label: '2h', mins: 120 },
+                        { label: '3h', mins: 180 },
+                        { label: '4h', mins: 240 },
+                        { label: '6h', mins: 360 },
+                        { label: '8h', mins: 480 },
+                      ].map((preset) => (
+                        <button
+                          key={preset.mins}
+                          type="button"
+                          onClick={() => setDailyGoal(preset.mins)}
+                          className={cn(
+                            'px-2 py-0.5 text-[10px] font-mono font-medium rounded-md border transition-all cursor-pointer',
+                            dailyGoal === preset.mins
+                              ? 'bg-accent text-white border-accent shadow-2xs font-semibold'
+                              : 'bg-surface-elevated text-foreground-secondary border-border hover:border-accent/40 hover:text-foreground'
+                          )}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Slider Track with Perfectly Centered Thumb Wheel and Mathematically Calibrated Markers */}
+                <div className="space-y-1.5 pt-1">
+                  <div className="relative w-full">
+                    <input
+                      type="range"
+                      min="15"
+                      max="480"
+                      step="15"
+                      value={dailyGoal}
+                      onChange={(e) => setDailyGoal(Number(e.target.value))}
+                      className="slider-accent w-full cursor-pointer"
+                      style={{
+                        background: `linear-gradient(to right, rgb(var(--accent-rgb)) 0%, rgb(var(--accent-rgb)) ${((dailyGoal - 15) / 465) * 100}%, var(--border-subtle) ${((dailyGoal - 15) / 465) * 100}%, var(--border-subtle) 100%)`,
+                      }}
+                    />
+                  </div>
+
+                  {/* Accurately Calibrated Milestones matching exact thumb wheel center */}
+                  <div className="relative w-full h-5">
+                    {[
+                      { minutes: 15, label: '15m' },
+                      { minutes: 120, label: '2h (120m)' },
+                      { minutes: 240, label: '4h (240m)' },
+                      { minutes: 480, label: '8h (480m)' },
+                    ].map((m) => {
+                      const pct = ((m.minutes - 15) / 465) * 100;
+                      const isSelected = dailyGoal === m.minutes;
+                      return (
+                        <button
+                          key={m.minutes}
+                          type="button"
+                          onClick={() => setDailyGoal(m.minutes)}
+                          style={{
+                            left: `calc(${pct}% + ${(0.5 - pct / 100) * 20}px)`,
+                          }}
+                          className="absolute -translate-x-1/2 flex flex-col items-center group cursor-pointer transition-colors"
+                          title={`Set target to ${m.label}`}
+                        >
+                          <span
+                            className={cn(
+                              'text-[10px] font-mono transition-colors whitespace-nowrap',
+                              isSelected
+                                ? 'text-accent font-bold'
+                                : 'text-foreground-muted group-hover:text-foreground'
+                            )}
+                          >
+                            {m.label}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             </div>
 

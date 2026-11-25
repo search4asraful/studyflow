@@ -71,6 +71,16 @@ export class RoomController {
     }
   }
 
+  static async getTimerState(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = req.params.id as string;
+      const timerState = await TimerService.getAuthoritativeState(id);
+      res.status(200).json({ success: true, data: timerState });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async startTimer(req: Request, res: Response, next: NextFunction) {
     try {
       const id = req.params.id as string;

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { SafeUser, UserProfile } from '@studyflow/shared';
 import { apiRequest } from '../lib/api';
+import { broadcastLogout, broadcastLogin } from '../lib/tabSync';
 
 interface AuthState {
   user: SafeUser | null;
@@ -53,14 +54,18 @@ export const useAuthStore = create<AuthState>()(
       isInitialized: false,
       isAuthenticated: false,
 
-      setUser: (user, profile = null) =>
+      setUser: (user, profile = null) => {
+        if (user) {
+          broadcastLogin(user, profile);
+        }
         set({
           user,
           profile,
           isAuthenticated: !!user,
           isLoading: false,
           isInitialized: true,
-        }),
+        });
+      },
 
       checkAuth: async () => {
         if (checkAuthPromise) {
@@ -105,6 +110,7 @@ export const useAuthStore = create<AuthState>()(
         } catch {
           // Handled silently
         } finally {
+          broadcastLogout();
           set({
             user: null,
             profile: null,

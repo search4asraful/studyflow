@@ -4,7 +4,13 @@ import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { AppShell } from '../../components/layout/AppShell';
 import { useAuthStore } from '../../stores/authStore';
-import { apiRequest } from '../../lib/api';
+import {
+  apiRequest,
+  cachedApiRequest,
+  mutateApiCache,
+  invalidateApiCache,
+  subscribeToRevalidation,
+} from '../../lib/api';
 import { AnalyticsSummary, StudyRoom, Task } from '@studyflow/shared';
 import { formatMinutes } from '../../lib/utils';
 import { triggerConfetti } from '../../lib/confetti';
@@ -48,23 +54,45 @@ export default function DashboardPage() {
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
+
     async function loadDashboardData() {
       try {
         const [analyticsData, roomsData, tasksData] = await Promise.all([
-          apiRequest<AnalyticsSummary>('/analytics/summary').catch(() => null),
-          apiRequest<StudyRoom[]>('/rooms').catch(() => []),
-          apiRequest<Task[]>('/tasks/my').catch(() => []),
+          cachedApiRequest<AnalyticsSummary>('/analytics/summary').catch(() => null),
+          cachedApiRequest<StudyRoom[]>('/rooms').catch(() => []),
+          cachedApiRequest<Task[]>('/tasks/my').catch(() => []),
         ]);
 
-        if (analyticsData) setAnalytics(analyticsData);
-        if (roomsData) setRooms(roomsData);
-        if (tasksData) setTasks(tasksData);
+        if (active) {
+          if (analyticsData) setAnalytics(analyticsData);
+          if (roomsData) setRooms(roomsData);
+          if (tasksData) setTasks(tasksData);
+        }
       } catch {
         // Handled silently
       }
     }
 
     loadDashboardData();
+
+    // SWR real-time revalidation listeners (keep UI in sync when revalidation finishes)
+    const unsub1 = subscribeToRevalidation<AnalyticsSummary>('/analytics/summary', (data) => {
+      if (active && data) setAnalytics(data);
+    });
+    const unsub2 = subscribeToRevalidation<StudyRoom[]>('/rooms', (data) => {
+      if (active && data) setRooms(data);
+    });
+    const unsub3 = subscribeToRevalidation<Task[]>('/tasks/my', (data) => {
+      if (active && data) setTasks(data);
+    });
+
+    return () => {
+      active = false;
+      unsub1();
+      unsub2();
+      unsub3();
+    };
   }, []);
 
   // Time-based greeting
@@ -90,20 +118,39 @@ export default function DashboardPage() {
 
   const handleToggleTask = async (task: Task) => {
     const nextStatus = task.status === 'COMPLETED' ? 'TODO' : 'COMPLETED';
+    const previousTasks = [...tasks];
+
+    // 1. Instant 0ms Optimistic UI update
+    setTasks((prev) =>
+      prev.map((t) => (t.id === task.id ? { ...t, status: nextStatus } : t))
+    );
+
+    // 2. Instant Sensory Feedback
+    if (nextStatus === 'COMPLETED') {
+      playTaskCompletionSound();
+      triggerConfetti({ particleCount: 50 });
+      toast.success('Task marked as completed! 🎉');
+    } else {
+      toast.info('Task reopened');
+    }
+
+    // 3. Optimistic Cache Mutation
+    mutateApiCache<Task[]>('/tasks/my', (cached) =>
+      cached ? cached.map((t) => (t.id === task.id ? { ...t, status: nextStatus } : t)) : []
+    );
+
+    // 4. Background Sync with server & rollback on failure
     try {
       const updated = await apiRequest<Task>(`/tasks/${task.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ status: nextStatus }),
       });
       setTasks((prev) => prev.map((t) => (t.id === task.id ? updated : t)));
-      if (nextStatus === 'COMPLETED') {
-        playTaskCompletionSound();
-        triggerConfetti({ particleCount: 50 });
-        toast.success('Task marked as completed!');
-      } else {
-        toast.success('Task reopened');
-      }
+      invalidateApiCache('/analytics/summary');
     } catch (err: any) {
+      // Revert optimistic changes on network error
+      setTasks(previousTasks);
+      mutateApiCache<Task[]>('/tasks/my', () => previousTasks);
       toast.error(err.message || 'Failed to update task');
     }
   };

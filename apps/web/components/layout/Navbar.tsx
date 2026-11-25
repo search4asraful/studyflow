@@ -9,10 +9,12 @@ import {
   Globe,
   ArrowUpRight,
   ArrowRight,
+  LogOut,
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { CommandPalette } from '../ui/CommandPalette';
 import { ThemeToggle } from '../ui/ThemeToggle';
+import { cn } from '../../lib/utils';
 
 export interface NavbarProps {
   variant?: 'auto' | 'frontend' | 'admin';
@@ -23,6 +25,7 @@ export const Navbar: React.FC<NavbarProps> = ({ variant = 'auto' }) => {
   const user = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const checkAuth = useAuthStore((s) => s.checkAuth);
+  const logout = useAuthStore((s) => s.logout);
 
   const [isCommandOpen, setIsCommandOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -140,31 +143,47 @@ export const Navbar: React.FC<NavbarProps> = ({ variant = 'auto' }) => {
             {!mounted ? (
               <div className="h-9 w-20 bg-surface-subtle animate-pulse rounded-xl" />
             ) : isUserLoggedIn ? (
-              // User Profile Pill (Explicit h-9)
-              <Link
-                href="/settings"
-                className="h-9 px-2.5 inline-flex items-center gap-2 rounded-xl bg-surface-subtle hover:bg-surface-elevated border border-border hover:border-accent/40 transition-all select-none"
-                title="Account Settings"
-              >
-                <div className="relative">
-                  {user?.avatarUrl ? (
-                    <img
-                      src={user.avatarUrl}
-                      alt={user.name || 'User'}
-                      className="w-5 h-5 rounded-lg object-cover border border-accent/40 ring-1 ring-accent/20 shrink-0"
-                    />
-                  ) : (
-                    <div className="w-5 h-5 rounded-lg bg-accent/20 border border-accent/30 text-accent flex items-center justify-center font-bold text-[11px] shrink-0">
-                      {(user?.name || 'U').charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                  <span className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500 border border-surface" />
-                </div>
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                {/* User Profile Pill (Explicit h-9) */}
+                <Link
+                  href="/settings"
+                  className="h-9 px-2 sm:px-2.5 inline-flex items-center gap-2 rounded-xl bg-surface-subtle hover:bg-surface-elevated border border-border hover:border-accent/40 transition-all select-none"
+                  title="Account Settings"
+                >
+                  <div className="relative">
+                    {user?.avatarUrl ? (
+                      <img
+                        src={user.avatarUrl}
+                        alt={user.name || 'User'}
+                        className="w-5 h-5 rounded-lg object-cover border border-accent/40 ring-1 ring-accent/20 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-5 h-5 rounded-lg bg-accent/20 border border-accent/30 text-accent flex items-center justify-center font-bold text-[11px] shrink-0">
+                        {(user?.name || 'U').charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <span className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500 border border-surface" />
+                  </div>
 
-                <span className="hidden sm:inline-block text-xs font-medium text-foreground truncate max-w-27.5">
-                  {user?.name?.split(' ')[0] || 'User'}
-                </span>
-              </Link>
+                  <span className="hidden sm:inline-block text-xs font-medium text-foreground truncate max-w-27.5">
+                    {user?.name?.split(' ')[0] || 'User'}
+                  </span>
+                </Link>
+
+                {/* Mobile View Sign Out Button (Also visible on frontend pages without sidebar) */}
+                <button
+                  type="button"
+                  onClick={() => logout()}
+                  className={cn(
+                    'h-9 px-2.5 inline-flex items-center justify-center gap-1.5 rounded-xl text-xs font-medium text-rose-500 hover:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 hover:border-rose-500/30 transition-all cursor-pointer active:scale-95 shadow-2xs group',
+                    isAdminPanel ? 'md:hidden' : ''
+                  )}
+                  title="Sign Out"
+                >
+                  <LogOut className="w-3.5 h-3.5 shrink-0 transition-transform group-hover:-translate-x-0.5" />
+                  <span className="hidden xs:inline md:hidden text-[11px]">Sign Out</span>
+                </button>
+              </div>
             ) : (
               // Unauthenticated: Sign in & Register (Explicit h-9)
               <div className="flex items-center gap-1.5 sm:gap-2">

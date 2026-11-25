@@ -2,7 +2,11 @@
 
 import React, { useEffect, useState } from 'react';
 import { AppShell } from '../../components/layout/AppShell';
-import { apiRequest } from '../../lib/api';
+import {
+  apiRequest,
+  cachedApiRequest,
+  subscribeToRevalidation,
+} from '../../lib/api';
 import { AnalyticsSummary } from '@studyflow/shared';
 import { formatMinutes } from '../../lib/utils';
 import {
@@ -36,17 +40,31 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let active = true;
+
     async function loadAnalytics() {
       try {
-        const summary = await apiRequest<AnalyticsSummary>('/analytics/summary');
-        setData(summary);
+        const summary = await cachedApiRequest<AnalyticsSummary>('/analytics/summary');
+        if (active) {
+          setData(summary);
+          setLoading(false);
+        }
       } catch {
-        // Handled silently
-      } finally {
-        setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       }
     }
     loadAnalytics();
+
+    const unsub = subscribeToRevalidation<AnalyticsSummary>('/analytics/summary', (fresh) => {
+      if (active && fresh) setData(fresh);
+    });
+
+    return () => {
+      active = false;
+      unsub();
+    };
   }, []);
 
   const PIE_COLORS = ['#3F72AF', '#0EA5E9', '#10B981', '#8B5CF6'];

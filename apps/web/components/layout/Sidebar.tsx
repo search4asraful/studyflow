@@ -1,8 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   Timer,
@@ -15,9 +15,11 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { cn } from '../../lib/utils';
+import { prefetchApi } from '../../lib/api';
 
 export const Sidebar: React.FC = () => {
   const pathname = usePathname();
+  const router = useRouter();
   const logout = useAuthStore((s) => s.logout);
 
   const links = [
@@ -27,6 +29,27 @@ export const Sidebar: React.FC = () => {
     { href: '/analytics', label: 'Analytics', icon: BarChart3 },
     { href: '/settings', label: 'Settings', icon: Settings },
   ];
+
+  // Pre-warms Next.js route chunks and API cache before user clicks (perceived 0ms transition)
+  const handlePrefetch = useCallback((href: string) => {
+    try {
+      router.prefetch(href);
+      if (href === '/dashboard') {
+        prefetchApi('/analytics/summary');
+        prefetchApi('/rooms');
+        prefetchApi('/tasks/my');
+      } else if (href === '/rooms') {
+        prefetchApi('/rooms');
+      } else if (href === '/tasks') {
+        prefetchApi('/tasks/my');
+        prefetchApi('/rooms');
+      } else if (href === '/analytics') {
+        prefetchApi('/analytics/summary');
+      }
+    } catch {
+      // Handled silently
+    }
+  }, [router]);
 
   return (
     <aside className="w-64 border-r border-border bg-surface/95 backdrop-blur-md hidden md:flex flex-col justify-between p-4 fixed top-16 left-0 bottom-0 z-30 transition-colors duration-200 overflow-y-auto">
@@ -46,6 +69,8 @@ export const Sidebar: React.FC = () => {
                 <Link
                   key={link.href}
                   href={link.href}
+                  onMouseEnter={() => handlePrefetch(link.href)}
+                  onTouchStart={() => handlePrefetch(link.href)}
                   className={cn(
                     'flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all duration-150 group relative',
                     isActive
