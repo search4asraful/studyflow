@@ -218,58 +218,70 @@ export class RoomService {
     // Verify membership
     let member = room.members.find((m) => m.userId === userId);
     if (!member && !room.isPrivate) {
-      try {
-        // Auto-join if public room using upsert to prevent unique constraint race conditions
-        const newMember = await prisma.roomMember.upsert({
-          where: {
-            roomId_userId: { roomId, userId },
-          },
-          create: {
-            roomId,
-            userId,
-            role: RoomRole.MEMBER,
-          },
-          update: {
-            lastActiveAt: new Date(),
-          },
-          include: {
-            user: {
-              select: {
-                id: true,
-                email: true,
-                name: true,
-                avatarUrl: true,
-                bio: true,
-                createdAt: true,
-              },
+      // Re-verify against database in case member was created concurrently
+      member = (await prisma.roomMember.findUnique({
+        where: {
+          roomId_userId: { roomId, userId },
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              avatarUrl: true,
+              bio: true,
+              createdAt: true,
             },
           },
-        });
-        room.members.push(newMember as any);
-        member = newMember as any;
-      } catch {
-        // If a concurrent join or race condition occurred, safely read existing membership
-        const existing = await prisma.roomMember.findUnique({
-          where: {
-            roomId_userId: { roomId, userId },
-          },
-          include: {
-            user: {
-              select: {
-                id: true,
-                email: true,
-                name: true,
-                avatarUrl: true,
-                bio: true,
-                createdAt: true,
+        },
+      })) as any;
+
+      if (!member) {
+        try {
+          member = (await prisma.roomMember.create({
+            data: {
+              roomId,
+              userId,
+              role: RoomRole.MEMBER,
+            },
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  email: true,
+                  name: true,
+                  avatarUrl: true,
+                  bio: true,
+                  createdAt: true,
+                },
               },
             },
-          },
-        });
-        if (existing) {
-          room.members.push(existing as any);
-          member = existing as any;
+          })) as any;
+        } catch {
+          // If created concurrently in another thread, read the created member
+          member = (await prisma.roomMember.findUnique({
+            where: {
+              roomId_userId: { roomId, userId },
+            },
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  email: true,
+                  name: true,
+                  avatarUrl: true,
+                  bio: true,
+                  createdAt: true,
+                },
+              },
+            },
+          })) as any;
         }
+      }
+
+      if (member && !room.members.some((m) => m.userId === userId)) {
+        room.members.push(member as any);
       }
     } else if (!member) {
       throw new ForbiddenError('You are not a member of this private room');
@@ -370,13 +382,17 @@ export class RoomService {
     });
 
     if (!existingMember) {
-      await prisma.roomMember.create({
-        data: {
-          roomId: room.id,
-          userId,
-          role: RoomRole.MEMBER,
-        },
-      });
+      try {
+        await prisma.roomMember.create({
+          data: {
+            roomId: room.id,
+            userId,
+            role: RoomRole.MEMBER,
+          },
+        });
+      } catch {
+        // Ignored if joined concurrently
+      }
     }
 
     return {

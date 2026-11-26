@@ -14,6 +14,7 @@ interface AuthenticatedSocket extends Socket {
   data: {
     user: SafeUser;
     joinedRooms: Set<string>;
+    joiningRooms: Set<string>;
   };
 }
 
@@ -89,6 +90,7 @@ export function setupSocketServer(httpServer: HttpServer): SocketIOServer {
         createdAt: user.createdAt.toISOString(),
       };
       socket.data.joinedRooms = new Set<string>();
+      socket.data.joiningRooms = new Set<string>();
 
       next();
     } catch (err) {
@@ -102,9 +104,20 @@ export function setupSocketServer(httpServer: HttpServer): SocketIOServer {
 
     // Join room
     socket.on(SOCKET_EVENTS.CLIENT.ROOM_JOIN, async (data: { roomId: string }, callback) => {
+      const { roomId } = data || {};
+      if (!roomId) return;
+
+      // Prevent concurrent duplicate joins on the same socket
+      if (socket.data.joiningRooms.has(roomId)) {
+        if (typeof callback === 'function') {
+          callback({ success: true, deduplicated: true });
+        }
+        return;
+      }
+      socket.data.joiningRooms.add(roomId);
+
       try {
-        const { roomId } = data;
-        if (!roomId) return;
+        const isAlreadyJoined = socket.data.joinedRooms.has(roomId);
 
         // Verify or auto-join member
         const roomDetails = await RoomService.getRoomDetails(roomId, user.id);
@@ -125,20 +138,22 @@ export function setupSocketServer(httpServer: HttpServer): SocketIOServer {
           data: { lastActiveAt: new Date() },
         });
 
-        // Notify other participants
-        socket.to(`room:${resolvedRoomId}`).emit(SOCKET_EVENTS.SERVER.ROOM_PARTICIPANT_JOINED, {
-          user,
-          roomId: resolvedRoomId,
-          timestamp: new Date().toISOString(),
-        });
+        // Only broadcast if the user was not already in this room on this socket connection
+        if (!isAlreadyJoined) {
+          socket.to(`room:${resolvedRoomId}`).emit(SOCKET_EVENTS.SERVER.ROOM_PARTICIPANT_JOINED, {
+            user,
+            roomId: resolvedRoomId,
+            timestamp: new Date().toISOString(),
+          });
 
-        // Broadcast live ephemeral participant join activity
-        RoomActivityService.broadcastActivity(resolvedRoomId, {
-          userId: user.id,
-          userName: user.name,
-          action: 'MEMBER_JOINED',
-          details: `${user.name} joined the room`,
-        });
+          // Broadcast live ephemeral participant join activity
+          RoomActivityService.broadcastActivity(resolvedRoomId, {
+            userId: user.id,
+            userName: user.name,
+            action: 'MEMBER_JOINED',
+            details: `${user.name} joined the room`,
+          });
+        }
 
         // Send full authoritative room state back to the joiner
         if (typeof callback === 'function') {
@@ -153,6 +168,8 @@ export function setupSocketServer(httpServer: HttpServer): SocketIOServer {
         if (typeof callback === 'function') {
           callback({ success: false, error: error.message });
         }
+      } finally {
+        socket.data.joiningRooms.delete(roomId);
       }
     });
 

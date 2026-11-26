@@ -132,4 +132,20 @@ describe('Multi-Client Real-Time Concurrency & Synchronization', () => {
     expect(receivedTask.roomId).toBe(testRoomId);
     expect(receivedTask.status).toBe('TODO');
   });
+
+  it('handles rapid concurrent ROOM_JOIN requests without unique constraint errors', async () => {
+    // Fire 3 simultaneous join emissions on the same client
+    const results = await Promise.all([
+      new Promise<any>((resolve) => clientAsraful.emit(SOCKET_EVENTS.CLIENT.ROOM_JOIN, { roomId: testRoomId }, resolve)),
+      new Promise<any>((resolve) => clientAsraful.emit(SOCKET_EVENTS.CLIENT.ROOM_JOIN, { roomId: testRoomId }, resolve)),
+      new Promise<any>((resolve) => clientAsraful.emit(SOCKET_EVENTS.CLIENT.ROOM_JOIN, { roomId: testRoomId }, resolve)),
+    ]);
+
+    // All should either succeed or be safely deduplicated
+    results.forEach((res) => {
+      if (res) {
+        expect(res.error).toBeUndefined();
+      }
+    });
+  });
 });
