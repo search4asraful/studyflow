@@ -62,6 +62,7 @@ export default function SettingsPage() {
   const [avatarStatus, setAvatarStatus] = useState<'idle' | 'loading' | 'valid' | 'invalid'>('idle');
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [dailyGoal, setDailyGoal] = useState(profile?.dailyGoalMinutes || 120);
+  const [hasManuallyEditedGoal, setHasManuallyEditedGoal] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
 
   // Sync form when user loads asynchronously
@@ -74,6 +75,13 @@ export default function SettingsPage() {
       }
     }
   }, [user]);
+
+  // Sync daily goal when profile loads or updates asynchronously (fixes hydration delay)
+  useEffect(() => {
+    if (profile?.dailyGoalMinutes && !hasManuallyEditedGoal) {
+      setDailyGoal(profile.dailyGoalMinutes);
+    }
+  }, [profile?.dailyGoalMinutes, hasManuallyEditedGoal]);
 
   // Handle instant preview and avatar image URL validation
   useEffect(() => {
@@ -638,7 +646,10 @@ export default function SettingsPage() {
                         <button
                           key={preset.mins}
                           type="button"
-                          onClick={() => setDailyGoal(preset.mins)}
+                          onClick={() => {
+                            setDailyGoal(preset.mins);
+                            setHasManuallyEditedGoal(true);
+                          }}
                           className={cn(
                             'px-2 py-0.5 text-[10px] font-mono font-medium rounded-md border transition-all cursor-pointer',
                             dailyGoal === preset.mins
@@ -662,7 +673,10 @@ export default function SettingsPage() {
                       max="480"
                       step="15"
                       value={dailyGoal}
-                      onChange={(e) => setDailyGoal(Number(e.target.value))}
+                      onChange={(e) => {
+                        setDailyGoal(Number(e.target.value));
+                        setHasManuallyEditedGoal(true);
+                      }}
                       className="slider-accent w-full cursor-pointer"
                       style={{
                         background: `linear-gradient(to right, rgb(var(--accent-rgb)) 0%, rgb(var(--accent-rgb)) ${((dailyGoal - 15) / 465) * 100}%, var(--border-subtle) ${((dailyGoal - 15) / 465) * 100}%, var(--border-subtle) 100%)`,
@@ -684,7 +698,10 @@ export default function SettingsPage() {
                         <button
                           key={m.minutes}
                           type="button"
-                          onClick={() => setDailyGoal(m.minutes)}
+                          onClick={() => {
+                            setDailyGoal(m.minutes);
+                            setHasManuallyEditedGoal(true);
+                          }}
                           style={{
                             left: `calc(${pct}% + ${(0.5 - pct / 100) * 20}px)`,
                           }}
