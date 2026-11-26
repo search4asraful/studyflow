@@ -18,7 +18,7 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({ className = '', showLa
       onClick={toggleTheme}
       type="button"
       className={cn(
-        'inline-flex items-center justify-center h-9 rounded-xl text-foreground-secondary hover:text-foreground bg-surface-elevated/80 hover:bg-surface-elevated border border-border transition-colors duration-150 focus:outline-hidden focus:ring-1 focus:ring-accent shrink-0 cursor-pointer',
+        'inline-flex items-center justify-center h-9 rounded-xl bg-surface-subtle hover:bg-surface-elevated border border-border hover:border-accent/40 transition-all shadow-2xs text-foreground-secondary hover:text-foreground duration-150 shrink-0 cursor-pointer',
         showLabel ? 'px-3 gap-2' : 'w-9',
         className
       )}

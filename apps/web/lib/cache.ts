@@ -204,8 +204,18 @@ export function invalidateApiCache(pattern?: string, shouldBroadcast: boolean = 
  * Optimistically mutate cache in memory and storage immediately
  */
 export function mutateApiCache<T>(key: string, updater: (oldData: T | undefined) => T): void {
-  const current = memoryCache.get(key) as CacheEntry<T> | undefined;
+  let current = memoryCache.get(key) as CacheEntry<T> | undefined;
+  if (!current) {
+    const sessionEntry = getSessionStorageItem<T>(key);
+    if (sessionEntry) {
+      current = sessionEntry;
+      memoryCache.set(key, sessionEntry);
+    }
+  }
+
   const newData = updater(current?.data);
+  if (newData === undefined) return;
+
   const entry: CacheEntry<T> = { data: newData, timestamp: Date.now() };
   memoryCache.set(key, entry);
   setSessionStorageItem(key, entry);

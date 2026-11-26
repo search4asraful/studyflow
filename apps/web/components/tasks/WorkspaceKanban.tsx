@@ -32,6 +32,7 @@ import { toast } from 'sonner';
 
 export interface WorkspaceKanbanProps {
   tasks?: Task[];
+  isLoading?: boolean;
   onUpdateTask?: (taskId: string, updates: Partial<Task>) => void;
   onDeleteTask?: (taskId: string) => void;
   onEditTask?: (task: Task) => void;
@@ -49,171 +50,7 @@ export interface WorkspaceKanbanProps {
   showDelete?: boolean;
 }
 
-// 8 Realistic Group Astro engineering workspace tasks (2 in each column)
-export const INITIAL_ASTRO_TASKS: Task[] = [
-  {
-    id: 'astro-task-1',
-    roomId: 'SD3ASTRO',
-    title: 'Telemetry streaming pipeline refactor',
-    description: 'Upgrade WebRTC telemetry data channels to bidirectional binary protobuf frames with zero frame dropping.',
-    status: 'BACKLOG',
-    priority: 'MEDIUM',
-    assigneeId: 'elena-rostova',
-    assignee: {
-      id: 'elena-rostova',
-      name: 'Elena Rostova',
-      email: 'elena.r@astro.io',
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
-      createdAt: new Date().toISOString(),
-    },
-    createdById: 'owner-1',
-    dueDate: '2026-11-28',
-    position: 0,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'astro-task-2',
-    roomId: 'SD3ASTRO',
-    title: 'Ion drive power bus telemetry schema',
-    description: 'Define CAN bus high-voltage discharge threshold alerts and real-time state machine monitors.',
-    status: 'BACKLOG',
-    priority: 'LOW',
-    assigneeId: null,
-    assignee: null,
-    createdById: 'owner-1',
-    dueDate: '2026-12-02',
-    position: 1,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'astro-task-3',
-    roomId: 'SD3ASTRO',
-    title: 'Thermal dissipation model verification',
-    description: 'Validate finite element analysis boundary conditions against radiator vacuum chamber sensor data.',
-    status: 'TODO',
-    priority: 'URGENT',
-    assigneeId: 'marcus-vance',
-    assignee: {
-      id: 'marcus-vance',
-      name: 'Marcus Vance',
-      email: 'marcus.v@astro.io',
-      avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
-      createdAt: new Date().toISOString(),
-    },
-    createdById: 'owner-1',
-    dueDate: '2026-11-25',
-    position: 0,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'astro-task-4',
-    roomId: 'SD3ASTRO',
-    title: 'Reaction wheel PID controller tuning',
-    description: 'Mitigate angular momentum saturation under 3-axis disturbance torques during orbit transfer maneuver.',
-    status: 'TODO',
-    priority: 'HIGH',
-    assigneeId: 'asraful-islam',
-    assignee: {
-      id: 'asraful-islam',
-      name: 'Md. Asraful Islam',
-      email: 'asraful@studyflow.dev',
-      avatarUrl: '',
-      createdAt: new Date().toISOString(),
-    },
-    createdById: 'owner-1',
-    dueDate: '2026-11-26',
-    position: 1,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'astro-task-5',
-    roomId: 'SD3ASTRO',
-    title: 'Star tracker optical calibration loop',
-    description: 'Run quaternions solver and centroid tracking matrix through synthetic deep-space star field test suite.',
-    status: 'IN_PROGRESS',
-    priority: 'HIGH',
-    assigneeId: 'sarah-chen',
-    assignee: {
-      id: 'sarah-chen',
-      name: 'Dr. Sarah Chen',
-      email: 'sarah.chen@astro.io',
-      avatarUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=100&auto=format&fit=crop&q=80',
-      createdAt: new Date().toISOString(),
-    },
-    createdById: 'owner-1',
-    dueDate: '2026-11-24',
-    position: 0,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'astro-task-6',
-    roomId: 'SD3ASTRO',
-    title: 'GSAP HUD spatial depth shader integration',
-    description: 'Choreograph telemetry instrument dials and tactile perspective transforms on card focus states.',
-    status: 'IN_PROGRESS',
-    priority: 'MEDIUM',
-    assigneeId: 'asraful-islam',
-    assignee: {
-      id: 'asraful-islam',
-      name: 'Md. Asraful Islam',
-      email: 'asraful@studyflow.dev',
-      avatarUrl: '',
-      createdAt: new Date().toISOString(),
-    },
-    createdById: 'owner-1',
-    dueDate: '2026-11-23',
-    position: 1,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'astro-task-7',
-    roomId: 'SD3ASTRO',
-    title: 'Solar array deployment actuator tests',
-    description: 'Verified motorized hinge drive telemetry with zero torque overshoot across 12 full cycles.',
-    status: 'COMPLETED',
-    priority: 'HIGH',
-    assigneeId: 'marcus-vance',
-    assignee: {
-      id: 'marcus-vance',
-      name: 'Marcus Vance',
-      email: 'marcus.v@astro.io',
-      avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
-      createdAt: new Date().toISOString(),
-    },
-    createdById: 'owner-1',
-    dueDate: '2026-11-21',
-    position: 0,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'astro-task-8',
-    roomId: 'SD3ASTRO',
-    title: 'Orbital rendezvous trajectory simulation',
-    description: 'Clohessy-Wiltshire relative motion equations checked for low-fuel station-keeping rendezvous.',
-    status: 'COMPLETED',
-    priority: 'LOW',
-    assigneeId: 'elena-rostova',
-    assignee: {
-      id: 'elena-rostova',
-      name: 'Elena Rostova',
-      email: 'elena.r@astro.io',
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
-      createdAt: new Date().toISOString(),
-    },
-    createdById: 'owner-1',
-    dueDate: '2026-11-20',
-    position: 1,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
+
 
 interface KanbanColumnConfig {
   id: TaskStatus;
@@ -261,6 +98,7 @@ const KANBAN_COLUMNS: KanbanColumnConfig[] = [
 
 export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
   tasks: propTasks,
+  isLoading = false,
   onUpdateTask,
   onDeleteTask,
   onEditTask,
@@ -277,9 +115,9 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
   onSelectFocusTask,
   showDelete = true,
 }) => {
-  // Use prop tasks if provided, otherwise fall back to demo tasks
+  // Use prop tasks if provided, otherwise empty array
   const [localTasks, setLocalTasks] = useState<Task[]>(() => {
-    return propTasks !== undefined ? propTasks : INITIAL_ASTRO_TASKS;
+    return propTasks !== undefined ? propTasks : [];
   });
 
   // Keep synced if propTasks changes from socket
@@ -291,8 +129,20 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
 
   const [claimingTaskIds, setClaimingTaskIds] = useState<Set<string>>(new Set());
 
-  // Permission gate: Only task creator, room host (OWNER), or room moderator can edit/delete/move/reopen tasks
+  // Permission gate: Only task creator, assignee, room host (OWNER), or room moderator can edit/move/reopen tasks
   const canUserManageTask = (task: Task): boolean => {
+    if (!currentUserId) return true;
+    if (task.createdById === currentUserId) return true;
+    if (task.assigneeId === currentUserId || task.assignee?.id === currentUserId) return true;
+    if (currentUserRole === 'OWNER' || (roomOwnerId && roomOwnerId === currentUserId)) return true;
+    if (currentUserRole === 'MODERATOR') return true;
+    const userMember = members.find((m) => m.userId === currentUserId);
+    if (userMember?.role === 'OWNER' || userMember?.role === 'MODERATOR') return true;
+    return false;
+  };
+
+  // Only task creator, room host (OWNER), or room moderator can delete tasks
+  const canUserDeleteTask = (task: Task): boolean => {
     if (!currentUserId) return true;
     if (task.createdById === currentUserId) return true;
     if (currentUserRole === 'OWNER' || (roomOwnerId && roomOwnerId === currentUserId)) return true;
@@ -309,32 +159,33 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
       if (onClaimTask) {
         await onClaimTask(taskId);
       } else {
-        // Fallback for standalone / demo mode
-        const memberUser = members.find((m) => m.userId === currentUserId)?.user || {
-          id: currentUserId || 'me',
+        const memberUser = members.find((m) => m.userId === currentUserId)?.user || (currentUserId ? {
+          id: currentUserId,
           name: 'You',
           email: '',
           avatarUrl: null,
           bio: null,
           createdAt: new Date().toISOString(),
-        };
-        setLocalTasks((prev) =>
-          prev.map((t) =>
-            t.id === taskId
-              ? {
-                  ...t,
-                  assigneeId: memberUser.id,
-                  assignee: {
-                    id: memberUser.id,
-                    name: memberUser.name,
-                    email: memberUser.email,
-                    avatarUrl: memberUser.avatarUrl || null,
-                    createdAt: new Date().toISOString(),
-                  },
-                }
-              : t
-          )
-        );
+        } : null);
+        if (memberUser) {
+          setLocalTasks((prev) =>
+            prev.map((t) =>
+              t.id === taskId
+                ? {
+                    ...t,
+                    assigneeId: memberUser.id,
+                    assignee: {
+                      id: memberUser.id,
+                      name: memberUser.name,
+                      email: memberUser.email,
+                      avatarUrl: memberUser.avatarUrl || null,
+                      createdAt: new Date().toISOString(),
+                    },
+                  }
+                : t
+            )
+          );
+        }
       }
     } finally {
       setClaimingTaskIds((prev) => {
@@ -567,6 +418,15 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className={cn('flex flex-col items-center justify-center flex-1 min-h-[350px] p-8 text-center space-y-3 card-subtle rounded-2xl', className)}>
+        <Loader2 className="w-7 h-7 text-accent animate-spin" />
+        <p className="text-xs font-medium text-foreground-muted">Loading workspace tasks...</p>
+      </div>
+    );
+  }
+
   return (
     <div ref={containerRef} className={cn('flex flex-col h-full min-h-0 w-full overflow-hidden gap-2 sm:gap-2.5', className)}>
       {/* Redesigned Task Filter & Sprint Progress Strip */}
@@ -784,6 +644,7 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
                       onClaim={handleClaimTask}
                       currentUserId={currentUserId}
                       canManage={canUserManageTask(task)}
+                      canDelete={canUserDeleteTask(task)}
                       isClaiming={claimingTaskIds.has(task.id)}
                       showRoomLink={showRoomLink}
                       isActiveFocus={activeTaskId === task.id}
@@ -863,6 +724,7 @@ export const WorkspaceKanban: React.FC<WorkspaceKanbanProps> = ({
                       onClaim={handleClaimTask}
                       currentUserId={currentUserId}
                       canManage={canUserManageTask(task)}
+                      canDelete={canUserDeleteTask(task)}
                       isClaiming={claimingTaskIds.has(task.id)}
                       showRoomLink={showRoomLink}
                       isActiveFocus={activeTaskId === task.id}
@@ -900,6 +762,7 @@ interface KanbanTaskCardProps {
   onClaim?: (taskId: string) => Promise<any> | void;
   currentUserId?: string;
   canManage?: boolean;
+  canDelete?: boolean;
   isClaiming?: boolean;
   showRoomLink?: boolean;
   isActiveFocus?: boolean;
@@ -917,6 +780,7 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
   onClaim,
   currentUserId,
   canManage = true,
+  canDelete = true,
   isClaiming = false,
   showRoomLink = false,
   isActiveFocus = false,
@@ -962,42 +826,92 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
 
   const pConfig = priorityStyles[task.priority] || priorityStyles.MEDIUM;
 
-  // Ultra-compact card view specifically for COMPLETED tasks
-  if (task.status === 'COMPLETED') {
-    return (
+  const isCompleted = task.status === 'COMPLETED';
+
+  // Animated top highlight bar color based on completion or priority
+  const topBorderClass = isCompleted
+    ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]'
+    : task.priority === 'URGENT'
+    ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]'
+    : task.priority === 'HIGH'
+    ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]'
+    : task.priority === 'LOW'
+    ? 'bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.6)]'
+    : 'bg-accent shadow-[0_0_8px_rgba(63,114,175,0.6)]';
+
+  return (
+    <div
+      id={`kanban-card-${task.id}`}
+      ref={cardRef}
+      draggable={canManage}
+      onDragStart={canManage ? onDragStart : undefined}
+      onDragEnd={canManage ? onDragEnd : undefined}
+      className={cn(
+        'group relative overflow-hidden rounded-xl p-2.5 sm:p-3 transition-all duration-200 shadow-2xs border select-none',
+        isCompleted
+          ? 'bg-surface-elevated/70 hover:bg-surface-elevated border-border/70 hover:border-emerald-500/50'
+          : 'bg-surface-elevated/90 hover:bg-surface-elevated border-border hover:border-accent/60',
+        canManage ? 'cursor-grab active:cursor-grabbing' : 'cursor-default',
+        isDragging && 'opacity-40 scale-[1.02] shadow-2xl rotate-1 border-accent ring-2 ring-accent/40',
+        !isCompleted && pConfig.glow
+      )}
+    >
+      {/* Interactive animated top border highlight based on priority or completion */}
       <div
-        id={`kanban-card-${task.id}`}
-        ref={cardRef}
-        draggable={canManage}
-        onDragStart={canManage ? onDragStart : undefined}
-        onDragEnd={canManage ? onDragEnd : undefined}
         className={cn(
-          'group relative overflow-hidden bg-surface/50 hover:bg-surface-elevated/80 border border-border-subtle hover:border-emerald-500/40 rounded-xl p-2.5 transition-all duration-200 shadow-2xs opacity-85 hover:opacity-100',
-          canManage ? 'cursor-grab active:cursor-grabbing' : 'cursor-default',
-          isDragging && 'opacity-40 scale-[1.02] shadow-2xl rotate-1 border-accent ring-2 ring-accent/40'
+          'absolute inset-x-0 top-0 h-[2px] rounded-t-xl transition-transform duration-200 ease-out origin-left pointer-events-none scale-x-0 group-hover:scale-x-100',
+          topBorderClass
         )}
-      >
-        {/* Interactive animated top border highlight */}
-        <div className="absolute inset-x-0 top-0 h-[2px] rounded-t-xl bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)] transition-transform duration-200 ease-out origin-left pointer-events-none scale-x-0 group-hover:scale-x-100" />
-        {/* Completed Compact Primary Row */}
-        <div className="flex items-center gap-2 min-w-0">
-          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-          <h4
-            className="text-xs font-medium text-foreground-muted line-through truncate flex-1 min-w-0"
-            title={task.title}
-          >
-            {task.title}
-          </h4>
+      />
+
+      {/* Priority Pill & Card Actions Header */}
+      <div className="flex items-center justify-between gap-1.5 mb-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+          {isCompleted ? (
+            <span className="inline-flex items-center gap-1 text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border bg-emerald-500/15 text-emerald-400 border-emerald-500/30 shrink-0">
+              <CheckCircle2 className="w-2.5 h-2.5" />
+              <span>DONE</span>
+            </span>
+          ) : null}
+
           <span
             className={cn(
-              'text-[9px] font-mono font-bold px-1.5 py-0.2 rounded border shrink-0',
+              'text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border shrink-0',
               pConfig.badge
             )}
           >
             {pConfig.label}
           </span>
+
+          {isActiveFocus && (
+            <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-accent bg-accent/15 border border-accent/30 px-1.5 py-0.5 rounded animate-pulse shrink-0">
+              <Target className="w-2.5 h-2.5" />
+              <span>Focusing</span>
+            </span>
+          )}
+        </div>
+
+        {/* Action Buttons: on desktop visible on hover, on mobile visible by default */}
+        <div className="flex items-center gap-1 shrink-0">
+          {onSelectFocus && !isActiveFocus && (
+            <button
+              type="button"
+              draggable={false}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelectFocus(task);
+              }}
+              className="text-foreground-muted hover:text-accent hover:bg-accent/10 p-1 rounded-md transition-colors cursor-pointer opacity-100 md:opacity-0 md:group-hover:opacity-100"
+              title="Set as Pomodoro focus target"
+            >
+              <Target className="w-3 h-3" />
+            </button>
+          )}
+
           {canManage && (
-            <div className="flex items-center gap-1 opacity-80 sm:opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+            <>
+              <GripVertical className="w-3 h-3 text-foreground-muted/60 hidden md:block opacity-0 group-hover:opacity-100 transition-opacity cursor-grab shrink-0" />
               {onEdit && (
                 <button
                   type="button"
@@ -1007,13 +921,13 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
                     e.stopPropagation();
                     onEdit(task);
                   }}
-                  className="text-foreground-muted hover:text-accent hover:bg-accent/10 p-0.5 rounded transition-colors cursor-pointer"
+                  className="text-foreground-muted hover:text-accent hover:bg-accent/10 p-1 rounded-md transition-colors cursor-pointer opacity-100 md:opacity-0 md:group-hover:opacity-100"
                   title="Edit task"
                 >
                   <Pencil className="w-3 h-3" />
                 </button>
               )}
-              {onDelete && (
+              {canDelete && onDelete && (
                 <button
                   type="button"
                   draggable={false}
@@ -1022,195 +936,49 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
                     e.stopPropagation();
                     onDelete(task.id);
                   }}
-                  className="text-foreground-muted hover:text-rose-500 hover:bg-rose-500/10 p-0.5 rounded transition-colors cursor-pointer"
+                  className="text-foreground-muted hover:text-rose-500 hover:bg-rose-500/10 p-1 rounded-md transition-colors cursor-pointer opacity-100 md:opacity-0 md:group-hover:opacity-100"
                   title="Delete task"
                 >
                   <Trash2 className="w-3 h-3" />
                 </button>
               )}
-            </div>
+            </>
           )}
         </div>
-
-        {/* Completed Compact Bottom Row: Assignee + Reopen */}
-        <div className="flex items-center justify-between mt-1.5 text-[10px] text-foreground-muted font-mono">
-          <div className="flex items-center gap-1 min-w-0">
-            {task.assignee ? (
-              <div className="flex items-center gap-1 min-w-0">
-                {task.assignee.avatarUrl ? (
-                  <img
-                    src={task.assignee.avatarUrl}
-                    alt={task.assignee.name}
-                    className="w-3.5 h-3.5 rounded-full object-cover border border-border shrink-0"
-                  />
-                ) : (
-                  <div className="w-3.5 h-3.5 rounded-full bg-accent/20 border border-accent/40 flex items-center justify-center text-[8px] text-accent font-bold shrink-0">
-                    {task.assignee.name.charAt(0)}
-                  </div>
-                )}
-                <span className="truncate max-w-20 text-[10px] text-foreground-muted">
-                  {task.assignee.name.split(' ')[0]}
-                </span>
-                {isAssignedToCurrentUser && (
-                  <span className="inline-flex items-center text-[9px] text-accent font-semibold ml-0.5">
-                    (You)
-                  </span>
-                )}
-              </div>
-            ) : onClaim ? (
-              <button
-                type="button"
-                draggable={false}
-                disabled={isClaiming}
-                onMouseDown={(e) => e.stopPropagation()}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onClaim(task.id);
-                }}
-                className={cn(
-                  'inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded border transition-all cursor-pointer font-sans shadow-2xs',
-                  isClaiming
-                    ? 'bg-accent/20 text-accent border-accent/40 cursor-wait opacity-80'
-                    : 'bg-accent/15 text-accent hover:bg-accent hover:text-white border-accent/30 active:scale-95'
-                )}
-                title="Assign to me"
-              >
-                {isClaiming ? (
-                  <Loader2 className="w-2.5 h-2.5 animate-spin shrink-0" />
-                ) : (
-                  <UserPlus className="w-2.5 h-2.5 shrink-0" />
-                )}
-                <span>{isClaiming ? 'Assigning...' : 'Assign to me'}</span>
-              </button>
-            ) : (
-              <span>Unassigned</span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            {showRoomLink && task.roomId && (
-              <Link
-                href={`/rooms/${task.roomId}`}
-                draggable={false}
-                onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-0.5 text-[9px] text-accent hover:text-accent-hover font-medium bg-accent/10 hover:bg-accent/20 px-1.5 py-0.5 rounded border border-accent/25 transition-colors shrink-0"
-                title="View in Study Room"
-              >
-                <span>Room</span>
-                <ArrowRight className="w-2.5 h-2.5" />
-              </Link>
-            )}
-            {canManage && prevStatus && (
-              <button
-                type="button"
-                draggable={false}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onMoveStatus(task.id, prevStatus);
-                }}
-                className="inline-flex items-center gap-1 bg-surface-subtle hover:bg-surface-elevated active:scale-95 py-0.5 px-2 rounded-md transition-all cursor-pointer text-foreground-muted hover:text-accent border border-border/60 text-[10px]"
-                title={`Reopen to ${prevStatus.replace('_', ' ')}`}
-              >
-                <ArrowLeft className="w-2.5 h-2.5" />
-                <span>Reopen</span>
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Compact card view for Active tasks (BACKLOG, TO DO, IN PROGRESS)
-  return (
-    <div
-      id={`kanban-card-${task.id}`}
-      ref={cardRef}
-      draggable={canManage}
-      onDragStart={canManage ? onDragStart : undefined}
-      onDragEnd={canManage ? onDragEnd : undefined}
-      className={cn(
-        'group relative overflow-hidden bg-surface-elevated/90 hover:bg-surface-elevated border border-border hover:border-accent/60 rounded-xl p-2.5 sm:p-3 transition-all duration-200 shadow-2xs',
-        canManage ? 'cursor-grab active:cursor-grabbing' : 'cursor-default',
-        isDragging && 'opacity-40 scale-[1.02] shadow-2xl rotate-1 border-accent ring-2 ring-accent/40',
-        pConfig.glow
-      )}
-    >
-      {/* Interactive animated top border highlight based on priority */}
-      <div
-        className={cn(
-          'absolute inset-x-0 top-0 h-[2px] rounded-t-xl transition-transform duration-200 ease-out origin-left pointer-events-none scale-x-0 group-hover:scale-x-100',
-          task.priority === 'URGENT'
-            ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]'
-            : task.priority === 'HIGH'
-            ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]'
-            : task.priority === 'LOW'
-            ? 'bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.6)]'
-            : 'bg-accent shadow-[0_0_8px_rgba(63,114,175,0.6)]'
-        )}
-      />
-      {/* Priority Pill & Card Actions Header */}
-      <div className="flex items-center justify-between mb-1.5">
-        <span
-          className={cn(
-            'text-[9px] font-mono font-bold px-1.5 py-0.2 rounded border',
-            pConfig.badge
-          )}
-        >
-          {pConfig.label}
-        </span>
-
-        {canManage && (
-          <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-            <GripVertical className="w-3 h-3 text-foreground-muted cursor-grab" />
-            {onEdit && (
-              <button
-                type="button"
-                draggable={false}
-                onMouseDown={(e) => e.stopPropagation()}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdit(task);
-                }}
-                className="text-foreground-muted hover:text-accent hover:bg-accent/10 p-0.5 rounded transition-colors cursor-pointer"
-                title="Edit task"
-              >
-                <Pencil className="w-3 h-3" />
-              </button>
-            )}
-            {onDelete && (
-              <button
-                type="button"
-                draggable={false}
-                onMouseDown={(e) => e.stopPropagation()}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(task.id);
-                }}
-                className="text-foreground-muted hover:text-rose-500 hover:bg-rose-500/10 p-0.5 rounded transition-colors cursor-pointer"
-                title="Delete task"
-              >
-                <Trash2 className="w-3 h-3" />
-              </button>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Title */}
-      <h4 className="text-xs font-semibold text-foreground leading-snug">
-        {task.title}
-      </h4>
+      <div className="flex items-start gap-1.5 min-w-0">
+        {isCompleted && (
+          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+        )}
+        <h4
+          className={cn(
+            'text-xs font-semibold leading-snug flex-1 min-w-0',
+            isCompleted
+              ? 'text-foreground-muted line-through decoration-foreground-muted/60'
+              : 'text-foreground'
+          )}
+          title={task.title}
+        >
+          {task.title}
+        </h4>
+      </div>
 
       {/* Description */}
       {task.description && (
-        <p className="text-[11px] text-foreground-secondary mt-1 line-clamp-2 leading-relaxed">
+        <p
+          className={cn(
+            'text-[11px] mt-1 line-clamp-2 leading-relaxed',
+            isCompleted ? 'text-foreground-muted/75' : 'text-foreground-secondary'
+          )}
+        >
           {task.description}
         </p>
       )}
 
-      {/* Assignee & Due Date Strip */}
-      <div className="flex items-center justify-between mt-2 text-[10px] text-foreground-muted">
+      {/* Assignee & Meta Strip */}
+      <div className="flex items-center justify-between gap-2 mt-2 pt-1.5 border-t border-border/40 text-[10px] text-foreground-muted">
         <div className="flex items-center gap-1.5 min-w-0">
           {task.assignee ? (
             <div className="flex items-center gap-1.5 min-w-0">
@@ -1218,19 +986,20 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
                 <img
                   src={task.assignee.avatarUrl}
                   alt={task.assignee.name}
-                  className="w-3.5 h-3.5 rounded-full object-cover border border-border shrink-0"
+                  className="w-4 h-4 rounded-full object-cover border border-border shrink-0"
                 />
               ) : (
-                <div className="w-3.5 h-3.5 rounded-full bg-accent/20 border border-accent/40 flex items-center justify-center text-[8px] text-accent font-bold shrink-0">
+                <div className="w-4 h-4 rounded-full bg-accent/20 border border-accent/40 flex items-center justify-center text-[8px] text-accent font-bold shrink-0">
                   {task.assignee.name.charAt(0)}
                 </div>
               )}
-              <span className="truncate max-w-22.5 text-foreground-secondary text-[10px]">
-                {task.assignee.name}
-              </span>
-              {isAssignedToCurrentUser && (
+              {isAssignedToCurrentUser ? (
                 <span className="inline-flex items-center text-[9px] font-semibold text-accent bg-accent/10 px-1.5 py-0.2 rounded border border-accent/20 shrink-0">
                   You
+                </span>
+              ) : (
+                <span className="truncate max-w-24 text-foreground-secondary text-[10px] font-medium">
+                  {task.assignee.name}
                 </span>
               )}
             </div>
@@ -1245,7 +1014,7 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
                 onClaim(task.id);
               }}
               className={cn(
-                'inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border transition-all cursor-pointer shadow-2xs select-none',
+                'inline-flex items-center gap-1 text-[9px] font-semibold px-2 py-0.5 rounded-md border transition-all cursor-pointer shadow-2xs select-none',
                 isClaiming
                   ? 'bg-accent/20 text-accent border-accent/40 cursor-wait opacity-80'
                   : 'bg-accent/15 text-accent hover:bg-accent hover:text-white border-accent/30 active:scale-95'
@@ -1253,9 +1022,9 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
               title="Assign this task to yourself"
             >
               {isClaiming ? (
-                <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+                <Loader2 className="w-2.5 h-2.5 animate-spin shrink-0" />
               ) : (
-                <UserPlus className="w-3 h-3 shrink-0" />
+                <UserPlus className="w-2.5 h-2.5 shrink-0" />
               )}
               <span>{isClaiming ? 'Assigning...' : 'Assign to me'}</span>
             </button>
@@ -1268,9 +1037,12 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
 
         <div className="flex items-center gap-1.5 shrink-0">
           {task.dueDate && (
-            <span className="flex items-center gap-1 text-foreground-muted font-mono text-[9px] shrink-0">
+            <span
+              className="flex items-center gap-1 text-foreground-muted font-mono text-[9px] shrink-0"
+              title={`Due: ${format(new Date(task.dueDate), 'PPP')}`}
+            >
               <Clock className="w-2.5 h-2.5 text-accent" />
-              {format(new Date(task.dueDate), 'MMM d')}
+              <span>{format(new Date(task.dueDate), 'MMM d')}</span>
             </span>
           )}
           {showRoomLink && task.roomId && (
@@ -1288,10 +1060,10 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
         </div>
       </div>
 
-      {/* Quick Move Status Arrows for Tactile / Mobile Touch Access */}
+      {/* Quick Move Buttons: visible on mobile / small-width displays (< md), hidden on desktop where drag & drop is active */}
       {canManage && (prevStatus || nextStatus) && (
         <div
-          className="flex items-center justify-between mt-2 pt-1.5 border-t border-border/40 text-[10px] font-mono text-foreground-muted"
+          className="flex md:hidden items-center justify-between gap-1.5 mt-2 pt-1.5 border-t border-border/40 text-[10px] font-mono text-foreground-muted"
           onMouseDown={(e) => e.stopPropagation()}
         >
           {prevStatus ? (
@@ -1306,31 +1078,10 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
               title={`Move to ${prevStatus.replace('_', ' ')}`}
             >
               <ArrowLeft className="w-2.5 h-2.5" />
-              <span>{prevStatus.replace('_', ' ')}</span>
+              <span>{isCompleted ? 'Reopen' : prevStatus.replace('_', ' ')}</span>
             </button>
           ) : (
             <div />
-          )}
-
-          {onSelectFocus && (
-            <button
-              type="button"
-              draggable={false}
-              onClick={(e) => {
-                e.stopPropagation();
-                onSelectFocus(task);
-              }}
-              className={cn(
-                'inline-flex items-center gap-1 py-1 px-2 rounded-md transition-all cursor-pointer text-[10px] font-semibold border select-none active:scale-95 mx-1',
-                isActiveFocus
-                  ? 'bg-accent text-white border-accent shadow-xs'
-                  : 'bg-surface-subtle hover:bg-surface-elevated text-foreground-secondary hover:text-accent border-border/80'
-              )}
-              title={isActiveFocus ? 'Currently in focus' : 'Set as current Pomodoro focus target'}
-            >
-              <Target className="w-2.5 h-2.5" />
-              <span>{isActiveFocus ? 'Focusing' : 'Focus'}</span>
-            </button>
           )}
 
           {nextStatus && (

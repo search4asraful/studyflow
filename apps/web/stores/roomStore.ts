@@ -34,6 +34,8 @@ interface RoomState {
   deleteTask: (taskId: string) => void;
   
   addActivity: (activity: RoomActivity) => void;
+  setError: (error: string | null) => void;
+  setLoading: (isLoading: boolean) => void;
   clearRoom: () => void;
 }
 
@@ -176,6 +178,10 @@ export const useRoomStore = create<RoomState>((set) => ({
         activities: [...state.activities.slice(-60), activity],
       };
     }),
+
+  setError: (error) => set({ error, isLoading: false }),
+
+  setLoading: (isLoading) => set({ isLoading }),
 
   clearRoom: () =>
     set({

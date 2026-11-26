@@ -40,6 +40,7 @@ import {
   Users,
   PanelRightClose,
   PanelRightOpen,
+  AlertCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -60,6 +61,8 @@ function RoomWorkspaceView({ roomId }: { roomId: string }) {
   const storeMembers = useRoomStore((s) => s.members);
   const storeTasks = useRoomStore((s) => s.tasks);
   const storeActivities = useRoomStore((s) => s.activities);
+  const isStoreLoading = useRoomStore((s) => s.isLoading);
+  const storeError = useRoomStore((s) => s.error);
 
   // Timer Store for sticky mini-bar
   const timerDisplaySeconds = useTimerStore((s) => s.displaySeconds);
@@ -67,19 +70,11 @@ function RoomWorkspaceView({ roomId }: { roomId: string }) {
   const timerStatus = useTimerStore((s) => s.status);
   const timerCycle = useTimerStore((s) => s.currentCycle);
 
-  // Dynamic room object with fallback
-  const room = storeRoom || {
-    id: roomId,
-    name: roomId === 'SD3ASTRO' ? 'Group Astro — Focus Workspace' : 'Study Room Session',
-    description: 'Collaborative Pomodoro focus session and shared task workspace.',
-    inviteCode: roomId,
-    isPrivate: false,
-    ownerId: user?.id || 'owner',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
+  const isCurrentRoomLoaded = !isStoreLoading && storeRoom !== null && storeRoom.id === roomId;
 
-  const role = storeRole || 'OWNER';
+  // Authoritative room and role (no mock data fallback)
+  const room = storeRoom;
+  const role = storeRole || 'MEMBER';
 
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
@@ -107,9 +102,9 @@ function RoomWorkspaceView({ roomId }: { roomId: string }) {
   const [taskSearchQuery, setTaskSearchQuery] = useState('');
 
   const isOwner = Boolean(
-    (room.ownerId && user?.id && room.ownerId === user.id) || role === 'OWNER'
+    (room?.ownerId && user?.id && room.ownerId === user.id) || role === 'OWNER'
   );
-  const canControlTimer = role === 'OWNER' || role === 'MODERATOR' || !storeRoom;
+  const canControlTimer = role === 'OWNER' || role === 'MODERATOR';
 
   // Track unread chat messages for badge
   useEffect(() => {
@@ -159,7 +154,7 @@ function RoomWorkspaceView({ roomId }: { roomId: string }) {
   } = useRoomSocket(roomId);
 
   const handleCopyInviteCode = () => {
-    const code = room.inviteCode || roomId;
+    const code = room?.inviteCode || roomId;
     navigator.clipboard.writeText(code);
     setCopiedCode(true);
     toast.success(`Invite code #${code} copied`);
@@ -241,7 +236,7 @@ function RoomWorkspaceView({ roomId }: { roomId: string }) {
   const canUserManageTask = (task: Task): boolean => {
     if (!user?.id) return true;
     if (task.createdById === user.id) return true;
-    if (role === 'OWNER' || room.ownerId === user.id) return true;
+    if (role === 'OWNER' || (room && room.ownerId === user.id)) return true;
     if (role === 'MODERATOR') return true;
     const userMember = storeMembers.find((m) => m.userId === user.id);
     if (userMember?.role === 'OWNER' || userMember?.role === 'MODERATOR') return true;
@@ -300,6 +295,44 @@ function RoomWorkspaceView({ roomId }: { roomId: string }) {
     HIGH: 'bg-amber-400',
     URGENT: 'bg-rose-400',
   };
+
+  if (storeError) {
+    return (
+      <div className="flex flex-col items-center justify-center flex-1 min-h-[450px] p-6 text-center space-y-4">
+        <div className="w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center shadow-xs">
+          <AlertCircle className="w-7 h-7" />
+        </div>
+        <div className="space-y-1.5 max-w-md">
+          <h2 className="text-base font-bold text-foreground">Room Unavailable</h2>
+          <p className="text-xs text-foreground-muted leading-relaxed">
+            {storeError || 'This study room could not be found or you do not have permission to access it.'}
+          </p>
+        </div>
+        <Link href="/rooms">
+          <Button variant="primary" size="sm" className="gap-2 cursor-pointer font-semibold">
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Back to All Rooms</span>
+          </Button>
+        </Link>
+      </div>
+    );
+  }
+
+  if (!isCurrentRoomLoaded || !room) {
+    return (
+      <div className="flex flex-col items-center justify-center flex-1 min-h-[450px] p-6 text-center space-y-4">
+        <div className="w-14 h-14 rounded-2xl bg-accent/10 border border-accent/20 text-accent flex items-center justify-center shadow-xs">
+          <Loader2 className="w-7 h-7 animate-spin" />
+        </div>
+        <div className="space-y-1">
+          <h2 className="text-sm font-bold text-foreground">Entering Study Room...</h2>
+          <p className="text-xs text-foreground-muted">
+            Synchronizing focus timer & collaborative workspace
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -539,6 +572,7 @@ function RoomWorkspaceView({ roomId }: { roomId: string }) {
               <div className="flex-1 flex flex-col min-h-0 pb-4">
                 <WorkspaceKanban
                   tasks={storeTasks}
+                  isLoading={!isCurrentRoomLoaded}
                   onUpdateTask={(taskId, updates) => updateTask(taskId, updates)}
                   onDeleteTask={(taskId) => {
                     if (activeTaskId === taskId) setActiveTaskId(null);
@@ -574,6 +608,7 @@ function RoomWorkspaceView({ roomId }: { roomId: string }) {
                 <div className="flex-1 min-h-0">
                   <WorkspaceKanban
                     tasks={storeTasks}
+                    isLoading={!isCurrentRoomLoaded}
                     onUpdateTask={(taskId, updates) => updateTask(taskId, updates)}
                     onDeleteTask={(taskId) => {
                       if (activeTaskId === taskId) setActiveTaskId(null);
@@ -766,10 +801,16 @@ function RoomWorkspaceView({ roomId }: { roomId: string }) {
                             <div className="flex items-center gap-2 shrink-0">
                               {/* Assignee */}
                               {task.assignee ? (
-                                <span className="text-[10px] font-mono text-foreground-muted hidden sm:inline-flex items-center gap-1 bg-surface-subtle px-1.5 py-0.5 rounded border border-border/60">
-                                  <User className="w-2.5 h-2.5 text-accent" />
-                                  <span className="truncate max-w-17.5">{task.assignee.name}</span>
-                                </span>
+                                task.assignee.id === user?.id ? (
+                                  <span className="text-[10px] font-semibold text-accent hidden sm:inline-flex items-center gap-1 bg-accent/10 px-1.5 py-0.5 rounded border border-accent/20">
+                                    You
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-mono text-foreground-muted hidden sm:inline-flex items-center gap-1 bg-surface-subtle px-1.5 py-0.5 rounded border border-border/60">
+                                    <User className="w-2.5 h-2.5 text-accent" />
+                                    <span className="truncate max-w-17.5">{task.assignee.name}</span>
+                                  </span>
+                                )
                               ) : (
                                 <button
                                   type="button"

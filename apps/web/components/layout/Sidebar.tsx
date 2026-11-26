@@ -96,34 +96,32 @@ export const Sidebar: React.FC = () => {
             })}
           </div>
         </div>
-
-        {/* Quick Room Action */}
-        <div className="px-1 pt-1">
-          <Link
-            href="/rooms/create"
-            className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-accent hover:bg-accent-hover text-white text-xs font-semibold shadow-md shadow-accent/25 hover:shadow-lg hover:shadow-accent/35 transition-all group active:scale-[0.98]"
-          >
-            <Plus className="w-4 h-4 text-white group-hover:rotate-90 transition-transform duration-200" />
-            <span>New Room</span>
-          </Link>
-        </div>
       </div>
 
       {/* Bottom Section: Activity Status & Sign Out */}
       <div className="space-y-3 pt-3">
-        {/* Dynamic Online Activity & Peer Reachability Card */}
-        <OnlineActivityStatus />
+        {/* Quick Room Action */}
+        <Link
+          href="/rooms/create"
+          className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-accent hover:bg-accent-hover text-white text-xs font-semibold shadow-md shadow-accent/25 hover:shadow-lg hover:shadow-accent/35 transition-all group active:scale-[0.98]"
+        >
+          <Plus className="w-4 h-4 text-white group-hover:rotate-90 transition-transform duration-200" />
+          <span>New Room</span>
+        </Link>
 
         {/* Sign Out Button */}
         <button
           onClick={() => logout()}
-          className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-medium text-red-500 hover:text-red-600 hover:bg-red-500/10 border border-red-500/20 hover:border-red-500/30 transition-all cursor-pointer shadow-2xs group"
+          className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-medium text-red-500 hover:text-red-600 dark:text-white hover:bg-red-500/10 dark:bg-red-500/30 border border-red-500/20 hover:border-red-500/30 transition-all cursor-pointer shadow-2xs group"
           title="Sign out of StudyFlow"
           type="button"
         >
           <LogOut className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5" />
           <span>Sign Out</span>
         </button>
+
+        {/* Dynamic Online Activity & Peer Reachability Card */}
+        <OnlineActivityStatus />
       </div>
     </aside>
   );

@@ -21,6 +21,9 @@ export function useRoomSocket(roomId: string | undefined) {
   const updateTask = useRoomStore((s) => s.updateTask);
   const deleteTask = useRoomStore((s) => s.deleteTask);
   const addActivity = useRoomStore((s) => s.addActivity);
+  const setError = useRoomStore((s) => s.setError);
+  const setLoading = useRoomStore((s) => s.setLoading);
+  const clearRoom = useRoomStore((s) => s.clearRoom);
 
   const syncAuthoritativeState = useTimerStore((s) => s.syncAuthoritativeState);
   const syncTick = useTimerStore((s) => s.syncTick);
@@ -58,14 +61,47 @@ export function useRoomSocket(roomId: string | undefined) {
             broadcastTimerSync(roomId, response.data.timerState);
           }
         } else if (response?.error) {
+          const currentRoom = useRoomStore.getState().room;
+          if (!currentRoom || currentRoom.id !== roomId) {
+            setError(response.error);
+          }
           toast.error(response.error);
         }
       }
     );
-  }, [roomId, setRoomState, syncAuthoritativeState]);
+  }, [roomId, setRoomState, syncAuthoritativeState, setError]);
 
   useEffect(() => {
     if (!roomId) return;
+    let isSubscribed = true;
+
+    // Reset room state if navigating from a different room or not yet loaded
+    const currentStoreRoom = useRoomStore.getState().room;
+    if (currentStoreRoom && currentStoreRoom.id !== roomId) {
+      clearRoom();
+    } else if (!currentStoreRoom) {
+      setLoading(true);
+    }
+
+    // Parallel fast REST fetch for initial room data
+    apiRequest<any>(`/rooms/${roomId}`)
+      .then((payload) => {
+        if (!isSubscribed || isLeavingRef.current) return;
+        if (payload) {
+          setRoomState(payload);
+          if (payload.timerState) {
+            syncAuthoritativeState(payload.timerState);
+            broadcastTimerSync(roomId, payload.timerState);
+          }
+        }
+      })
+      .catch((err) => {
+        if (!isSubscribed || isLeavingRef.current) return;
+        const currentRoom = useRoomStore.getState().room;
+        if (!currentRoom || currentRoom.id !== roomId) {
+          setError(err.message || 'Failed to load study room');
+        }
+      });
 
     const socket = getSocket();
 
@@ -246,11 +282,17 @@ export function useRoomSocket(roomId: string | undefined) {
       socket.off(SOCKET_EVENTS.SERVER.MEMBER_ROLE_UPDATED, onMemberRoleUpdated);
       socket.off(SOCKET_EVENTS.SERVER.ROOM_ERROR, onRoomError);
       socket.off(SOCKET_EVENTS.SERVER.ROOM_DELETED, onRoomDeleted);
+
+      isSubscribed = false;
+      clearRoom();
     };
   }, [
     roomId,
     joinRoom,
     setRoomState,
+    setError,
+    setLoading,
+    clearRoom,
     addMember,
     updateMemberOnlineStatus,
     updateMemberRole,

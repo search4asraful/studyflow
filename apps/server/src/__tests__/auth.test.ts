@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { updateProfileSchema } from '../shared';
 
 describe('Authentication and Security Logic', () => {
   const secret = 'test_secret_for_auth_eval_2026';
@@ -34,5 +35,41 @@ describe('Authentication and Security Logic', () => {
     expect(() => {
       jwt.verify(tampered, secret);
     }).toThrow();
+  });
+
+  it('validates avatar URL correctly in updateProfileSchema', () => {
+    // Valid HTTPS URL
+    const validHttp = updateProfileSchema.safeParse({
+      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+    });
+    expect(validHttp.success).toBe(true);
+
+    // Empty string (clearing avatar)
+    const emptyString = updateProfileSchema.safeParse({
+      avatarUrl: '',
+    });
+    expect(emptyString.success).toBe(true);
+
+    // Null (clearing avatar)
+    const nullVal = updateProfileSchema.safeParse({
+      avatarUrl: null,
+    });
+    expect(nullVal.success).toBe(true);
+
+    // Undefined (omitted)
+    const omitted = updateProfileSchema.safeParse({});
+    expect(omitted.success).toBe(true);
+
+    // Invalid non-URL string
+    const invalidString = updateProfileSchema.safeParse({
+      avatarUrl: 'not-a-valid-url',
+    });
+    expect(invalidString.success).toBe(false);
+
+    // Invalid URL without protocol
+    const noProtocol = updateProfileSchema.safeParse({
+      avatarUrl: 'example.com/avatar.jpg',
+    });
+    expect(noProtocol.success).toBe(false);
   });
 });

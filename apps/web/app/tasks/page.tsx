@@ -14,9 +14,10 @@ import {
   Plus,
   Search,
   Sparkles,
+  UserPlus,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { AppShell } from '../../components/layout/AppShell';
 import { CreateTaskModal } from '../../components/tasks/CreateTaskModal';
@@ -33,9 +34,14 @@ import {
 } from '../../lib/api';
 import { playTaskCompletionSound } from '../../lib/audio';
 import { triggerConfetti } from '../../lib/confetti';
+import { useAuthStore } from '../../stores/authStore';
 
 export default function MyTasksPage() {
+  const user = useAuthStore((s) => s.user);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const tasksRef = useRef<Task[]>([]);
+  tasksRef.current = tasks;
+
   const [rooms, setRooms] = useState<StudyRoom[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
@@ -56,6 +62,7 @@ export default function MyTasksPage() {
         ]);
         if (active) {
           setTasks(tasksData);
+          tasksRef.current = tasksData;
           setRooms(roomsData);
           setLoading(false);
         }
@@ -70,7 +77,10 @@ export default function MyTasksPage() {
 
     // SWR revalidation listeners
     const unsub1 = subscribeToRevalidation<Task[]>('/tasks/my', (data) => {
-      if (active && data) setTasks(data);
+      if (active && Array.isArray(data)) {
+        setTasks(data);
+        tasksRef.current = data;
+      }
     });
     const unsub2 = subscribeToRevalidation<StudyRoom[]>('/rooms', (data) => {
       if (active && data) setRooms(data);
@@ -85,10 +95,15 @@ export default function MyTasksPage() {
 
   const handleToggleComplete = async (task: Task) => {
     const nextStatus: TaskStatus = task.status === 'COMPLETED' ? 'TODO' : 'COMPLETED';
-    const previousTasks = [...tasks];
+    const taskId = task.id;
+    const originalTask = tasksRef.current.find((t) => t.id === taskId) || task;
 
     // 1. Instant 0ms Optimistic UI update
-    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: nextStatus } : t)));
+    setTasks((prev) => {
+      const next = prev.map((t) => (t.id === taskId ? { ...t, status: nextStatus } : t));
+      tasksRef.current = next;
+      return next;
+    });
 
     // 2. Instant sensory feedback
     if (nextStatus === 'COMPLETED') {
@@ -100,33 +115,76 @@ export default function MyTasksPage() {
     }
 
     // 3. Mutate cache optimistically
-    mutateApiCache<Task[]>('/tasks/my', (cached) =>
-      cached ? cached.map((t) => (t.id === task.id ? { ...t, status: nextStatus } : t)) : []
-    );
+    mutateApiCache<Task[]>('/tasks/my', (cached) => {
+      const base = Array.isArray(cached) && cached.length > 0 ? cached : tasksRef.current;
+      return base.map((t) => (t.id === taskId ? { ...t, status: nextStatus } : t));
+    });
 
     // 4. Background network sync with rollback on failure
     try {
-      const updated = await apiRequest<Task>(`/tasks/${task.id}`, {
+      const updated = await apiRequest<Task>(`/tasks/${taskId}`, {
         method: 'PATCH',
         body: JSON.stringify({ status: nextStatus }),
       });
-      setTasks((prev) => prev.map((t) => (t.id === task.id ? updated : t)));
+      setTasks((prev) => {
+        const next = prev.map((t) => (t.id === taskId ? updated : t));
+        tasksRef.current = next;
+        return next;
+      });
+      mutateApiCache<Task[]>('/tasks/my', (cached) => {
+        const base = Array.isArray(cached) && cached.length > 0 ? cached : tasksRef.current;
+        return base.map((t) => (t.id === taskId ? updated : t));
+      });
       invalidateApiCache('/analytics/summary');
     } catch (err: any) {
-      setTasks(previousTasks);
-      mutateApiCache<Task[]>('/tasks/my', () => previousTasks);
+      setTasks((prev) => {
+        const next = prev.map((t) => (t.id === taskId ? originalTask : t));
+        tasksRef.current = next;
+        return next;
+      });
+      mutateApiCache<Task[]>('/tasks/my', (cached) => {
+        const base = Array.isArray(cached) && cached.length > 0 ? cached : tasksRef.current;
+        return base.map((t) => (t.id === taskId ? originalTask : t));
+      });
       toast.error(err.message || 'Failed to update task');
     }
   };
 
   const handleUpdateTask = async (taskId: string, updates: Partial<Task>) => {
-    const previousTasks = [...tasks];
+    const originalTask = tasksRef.current.find((t) => t.id === taskId);
+    if (!originalTask) return;
+
+    // Optimistically attach assignee details if assigning to self or unassigning
+    let optimisticUpdates = { ...updates };
+    if (updates.assigneeId && user && updates.assigneeId === user.id) {
+      optimisticUpdates = {
+        ...optimisticUpdates,
+        assignee: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          avatarUrl: user.avatarUrl || null,
+          bio: user.bio || null,
+          createdAt: user.createdAt || new Date().toISOString(),
+        },
+      };
+    } else if (updates.assigneeId === null) {
+      optimisticUpdates = {
+        ...optimisticUpdates,
+        assignee: null,
+      };
+    }
 
     // 1. Instant optimistic update
-    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, ...updates } : t)));
-    mutateApiCache<Task[]>('/tasks/my', (cached) =>
-      cached ? cached.map((t) => (t.id === taskId ? { ...t, ...updates } : t)) : []
-    );
+    setTasks((prev) => {
+      const next = prev.map((t) => (t.id === taskId ? { ...t, ...optimisticUpdates } : t));
+      tasksRef.current = next;
+      return next;
+    });
+    mutateApiCache<Task[]>('/tasks/my', (cached) => {
+      const base = Array.isArray(cached) && cached.length > 0 ? cached : tasksRef.current;
+      return base.map((t) => (t.id === taskId ? { ...t, ...optimisticUpdates } : t));
+    });
 
     // 2. Background sync with rollback
     try {
@@ -134,11 +192,85 @@ export default function MyTasksPage() {
         method: 'PATCH',
         body: JSON.stringify(updates),
       });
-      setTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
+      setTasks((prev) => {
+        const next = prev.map((t) => (t.id === taskId ? updated : t));
+        tasksRef.current = next;
+        return next;
+      });
+      mutateApiCache<Task[]>('/tasks/my', (cached) => {
+        const base = Array.isArray(cached) && cached.length > 0 ? cached : tasksRef.current;
+        return base.map((t) => (t.id === taskId ? updated : t));
+      });
+      invalidateApiCache('/analytics/summary');
     } catch (err: any) {
-      setTasks(previousTasks);
-      mutateApiCache<Task[]>('/tasks/my', () => previousTasks);
+      setTasks((prev) => {
+        const next = prev.map((t) => (t.id === taskId ? originalTask : t));
+        tasksRef.current = next;
+        return next;
+      });
+      mutateApiCache<Task[]>('/tasks/my', (cached) => {
+        const base = Array.isArray(cached) && cached.length > 0 ? cached : tasksRef.current;
+        return base.map((t) => (t.id === taskId ? originalTask : t));
+      });
       toast.error(err.message || 'Failed to update task');
+    }
+  };
+
+  const handleClaimTask = async (taskId: string) => {
+    const originalTask = tasksRef.current.find((t) => t.id === taskId);
+    if (!originalTask) return;
+
+    if (user) {
+      const optimisticTask: Task = {
+        ...originalTask,
+        assigneeId: user.id,
+        assignee: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          avatarUrl: user.avatarUrl || null,
+          bio: user.bio || null,
+          createdAt: user.createdAt || new Date().toISOString(),
+        },
+        updatedAt: new Date().toISOString(),
+      };
+      setTasks((prev) => {
+        const next = prev.map((t) => (t.id === taskId ? optimisticTask : t));
+        tasksRef.current = next;
+        return next;
+      });
+      mutateApiCache<Task[]>('/tasks/my', (cached) => {
+        const base = Array.isArray(cached) && cached.length > 0 ? cached : tasksRef.current;
+        return base.map((t) => (t.id === taskId ? optimisticTask : t));
+      });
+    }
+
+    try {
+      const updated = await apiRequest<Task>(`/tasks/${taskId}/claim`, {
+        method: 'POST',
+      });
+      setTasks((prev) => {
+        const next = prev.map((t) => (t.id === taskId ? updated : t));
+        tasksRef.current = next;
+        return next;
+      });
+      mutateApiCache<Task[]>('/tasks/my', (cached) => {
+        const base = Array.isArray(cached) && cached.length > 0 ? cached : tasksRef.current;
+        return base.map((t) => (t.id === taskId ? updated : t));
+      });
+      invalidateApiCache('/analytics/summary');
+      toast.success('Task assigned to you! 🎉');
+    } catch (err: any) {
+      setTasks((prev) => {
+        const next = prev.map((t) => (t.id === taskId ? originalTask : t));
+        tasksRef.current = next;
+        return next;
+      });
+      mutateApiCache<Task[]>('/tasks/my', (cached) => {
+        const base = Array.isArray(cached) && cached.length > 0 ? cached : tasksRef.current;
+        return base.map((t) => (t.id === taskId ? originalTask : t));
+      });
+      toast.error(err.message || 'Failed to assign task');
     }
   };
 
@@ -159,15 +291,23 @@ export default function MyTasksPage() {
       priority: taskData.priority || 'MEDIUM',
       assigneeId: null,
       assignee: null,
-      createdById: 'me',
+      createdById: user?.id || 'me',
       dueDate: taskData.dueDate || null,
-      position: tasks.length,
+      position: tasksRef.current.length,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
     // 1. Instant optimistic add & close modal
-    setTasks((prev) => [optimisticTask, ...prev]);
+    setTasks((prev) => {
+      const next = [optimisticTask, ...prev];
+      tasksRef.current = next;
+      return next;
+    });
+    mutateApiCache<Task[]>('/tasks/my', (cached) => {
+      const base = Array.isArray(cached) ? cached : tasksRef.current;
+      return [optimisticTask, ...base];
+    });
     setIsCreateModalOpen(false);
     toast.success('Task created! 🎉');
 
@@ -180,11 +320,26 @@ export default function MyTasksPage() {
           roomId: targetRoomId,
         }),
       });
-      setTasks((prev) => prev.map((t) => (t.id === tempId ? created : t)));
-      invalidateApiCache('/tasks/my');
+      setTasks((prev) => {
+        const next = prev.map((t) => (t.id === tempId ? created : t));
+        tasksRef.current = next;
+        return next;
+      });
+      mutateApiCache<Task[]>('/tasks/my', (cached) => {
+        const base = Array.isArray(cached) ? cached : tasksRef.current;
+        return base.map((t) => (t.id === tempId ? created : t));
+      });
       invalidateApiCache('/analytics/summary');
     } catch (err: any) {
-      setTasks((prev) => prev.filter((t) => t.id !== tempId));
+      setTasks((prev) => {
+        const next = prev.filter((t) => t.id !== tempId);
+        tasksRef.current = next;
+        return next;
+      });
+      mutateApiCache<Task[]>('/tasks/my', (cached) => {
+        const base = Array.isArray(cached) ? cached : tasksRef.current;
+        return base.filter((t) => t.id !== tempId);
+      });
       toast.error(err.message || 'Failed to create task');
     }
   };
@@ -266,7 +421,10 @@ export default function MyTasksPage() {
           <div className="flex-1 min-h-[580px] flex flex-col">
             <WorkspaceKanban
               tasks={tasks}
+              isLoading={loading}
               onUpdateTask={handleUpdateTask}
+              onClaimTask={handleClaimTask}
+              currentUserId={user?.id}
               onOpenCreateModal={rooms.length > 0 ? () => setIsCreateModalOpen(true) : undefined}
               showRoomLink={true}
               showDelete={false}
@@ -398,7 +556,48 @@ export default function MyTasksPage() {
                             </span>
                           )}
                           <span>•</span>
-                          <span>Assigned to {task.assignee?.name || 'Unassigned'}</span>
+                          {task.assignee ? (
+                            task.assignee.id === user?.id || task.assigneeId === user?.id ? (
+                              <span className="inline-flex items-center gap-1.5 text-accent font-medium">
+                                {task.assignee.avatarUrl ? (
+                                  <img
+                                    src={task.assignee.avatarUrl}
+                                    alt={task.assignee.name}
+                                    className="w-3.5 h-3.5 rounded-full object-cover border border-border shrink-0"
+                                  />
+                                ) : (
+                                  <div className="w-3.5 h-3.5 rounded-full bg-accent/20 border border-accent/40 flex items-center justify-center text-[8px] text-accent font-bold shrink-0">
+                                    {(task.assignee.name || user?.name || 'U').charAt(0)}
+                                  </div>
+                                )}
+                                <span>On your plate</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 text-foreground-secondary">
+                                {task.assignee.avatarUrl ? (
+                                  <img
+                                    src={task.assignee.avatarUrl}
+                                    alt={task.assignee.name}
+                                    className="w-3.5 h-3.5 rounded-full object-cover border border-border shrink-0"
+                                  />
+                                ) : (
+                                  <div className="w-3.5 h-3.5 rounded-full bg-accent/20 border border-accent/40 flex items-center justify-center text-[8px] text-accent font-bold shrink-0">
+                                    {task.assignee.name.charAt(0)}
+                                  </div>
+                                )}
+                                <span>Assigned to {task.assignee.name}</span>
+                              </span>
+                            )
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleClaimTask(task.id)}
+                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-accent hover:underline cursor-pointer"
+                            >
+                              <UserPlus className="w-3 h-3" />
+                              <span>Assign to me</span>
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>

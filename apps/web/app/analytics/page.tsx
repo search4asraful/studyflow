@@ -8,7 +8,8 @@ import {
   subscribeToRevalidation,
 } from '../../lib/api';
 import { AnalyticsSummary } from '@studyflow/shared';
-import { formatMinutes } from '../../lib/utils';
+import { formatMinutes, cn } from '../../lib/utils';
+import { useAuthStore } from '../../stores/authStore';
 import {
   Flame,
   Clock,
@@ -19,6 +20,7 @@ import {
   Sparkles,
   TrendingUp,
   Award,
+  Target,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -33,11 +35,19 @@ import {
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
+  ReferenceLine,
 } from 'recharts';
 
 export default function AnalyticsPage() {
+  const profile = useAuthStore((s) => s.profile);
+  const dailyGoalMinutes = profile?.dailyGoalMinutes || 120;
+
   const [data, setData] = useState<AnalyticsSummary | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const todayFocus = data?.todayFocusMinutes ?? 0;
+  const todayGoalPercent = Math.min(100, Math.round((todayFocus / dailyGoalMinutes) * 100));
+  const goalAchievedToday = todayFocus >= dailyGoalMinutes;
 
   useEffect(() => {
     let active = true;
@@ -86,9 +96,15 @@ export default function AnalyticsPage() {
               Derived from completed Pomodoro sessions, focus durations, and resolved collaborative tasks.
             </p>
           </div>
-          <div className="flex items-center gap-2 card-subtle px-4 py-2 text-xs font-mono text-foreground-secondary border-accent/30">
-            <Calendar className="w-3.5 h-3.5 text-accent" />
-            <span>Past 30 Days Telemetry</span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 card-subtle px-3.5 py-2 text-xs font-mono text-accent border-accent/30 bg-accent/10 shadow-2xs">
+              <Target className="w-3.5 h-3.5 text-accent" />
+              <span>Target: {formatMinutes(dailyGoalMinutes)}/day</span>
+            </div>
+            <div className="flex items-center gap-2 card-subtle px-4 py-2 text-xs font-mono text-foreground-secondary border-accent/30 shadow-2xs">
+              <Calendar className="w-3.5 h-3.5 text-accent" />
+              <span>Past 30 Days Telemetry</span>
+            </div>
           </div>
         </div>
 
@@ -156,9 +172,15 @@ export default function AnalyticsPage() {
             <div className="text-3xl font-bold font-mono text-foreground">
               {formatMinutes(data?.monthFocusMinutes ?? 0)}
             </div>
-            <p className="text-[11px] text-foreground-secondary mt-1.5">
-              Today: {formatMinutes(data?.todayFocusMinutes ?? 0)}
-            </p>
+            <div className="flex items-center justify-between text-[11px] text-foreground-secondary mt-1.5">
+              <span>Today: {formatMinutes(todayFocus)} / {formatMinutes(dailyGoalMinutes)}</span>
+              <span className={cn(
+                'font-mono font-bold',
+                goalAchievedToday ? 'text-emerald-400' : 'text-accent'
+              )}>
+                {todayGoalPercent}%
+              </span>
+            </div>
           </div>
 
           <div className="card-interactive p-5 group">
@@ -199,7 +221,7 @@ export default function AnalyticsPage() {
           <div className="space-y-6">
             {/* Daily Trend Area Chart */}
             <div className="card-base p-6 sm:p-8">
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
                 <div>
                   <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">
                     Daily Focus Trend (Past 7 Days)
@@ -208,6 +230,10 @@ export default function AnalyticsPage() {
                     Minutes focused per day in collaborative study rooms
                   </p>
                 </div>
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-accent/25 bg-accent/10 text-xs font-mono font-semibold text-accent self-start sm:self-auto shadow-2xs">
+                  <Target className="w-3.5 h-3.5" />
+                  <span>Target Benchmark: {formatMinutes(dailyGoalMinutes)}</span>
+                </div>
               </div>
 
               <div className="h-72 w-full">
@@ -215,7 +241,7 @@ export default function AnalyticsPage() {
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart
                       data={data.dailyTrend}
-                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                      margin={{ top: 15, right: 10, left: -20, bottom: 0 }}
                     >
                       <defs>
                         <linearGradient id="focusGradient" x1="0" y1="0" x2="0" y2="1">
@@ -225,7 +251,13 @@ export default function AnalyticsPage() {
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" vertical={false} />
                       <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={11} tickLine={false} />
-                      <YAxis stroke="var(--text-muted)" fontSize={11} tickLine={false} unit="m" />
+                      <YAxis
+                        stroke="var(--text-muted)"
+                        fontSize={11}
+                        tickLine={false}
+                        unit="m"
+                        domain={[0, (dataMax: number) => Math.max(dataMax || 0, dailyGoalMinutes) + 30]}
+                      />
                       <Tooltip
                         contentStyle={{
                           backgroundColor: 'var(--bg-surface)',
@@ -238,6 +270,18 @@ export default function AnalyticsPage() {
                         labelStyle={{ color: 'var(--text-primary)', fontWeight: 700, marginBottom: '2px' }}
                         itemStyle={{ color: 'var(--accent)' }}
                         formatter={(val: any) => [`${val} minutes`, 'Focus Time']}
+                      />
+                      <ReferenceLine
+                        y={dailyGoalMinutes}
+                        stroke="rgb(var(--accent-rgb))"
+                        strokeDasharray="4 4"
+                        strokeWidth={1.5}
+                        label={{
+                          value: `Target: ${dailyGoalMinutes}m`,
+                          fill: 'var(--text-secondary)',
+                          fontSize: 10,
+                          position: 'top',
+                        }}
                       />
                       <Area
                         type="monotone"
