@@ -27,14 +27,14 @@ export default function CreditsPage() {
       name: 'Md. Asraful Islam Furdus',
       role: 'Lead Full-Stack Architect',
       details:
-        'next.js 16 App Router architecture, Express.js REST API, authoritative Socket.IO synchronization engine, Prisma ORM schema design, GSAP animations, and deployment pipeline.',
+        'next.js 16 App Router architecture, Express.js REST API, authoritative Socket.IO synchronization engine, Prisma ORM schema design, Web Design & Developing, GSAP animations, and deployment pipeline.',
       initials: 'AF',
     },
     {
       name: 'Md Shakil Mia',
-      role: 'Full-Stack Developer & Collaborator',
+      role: 'Collaborator',
       details:
-        'Multi-user concurrency & live presence tracking, database relations & migrations, productivity analytics calculation algorithms, UI components, and automated test suite verification.',
+        'Finding and fixing bugs, write issues, and providing feedback on the project. Contributed to the development of the project by implementing features and improving the overall user experience.',
       initials: 'SM',
     },
   ];

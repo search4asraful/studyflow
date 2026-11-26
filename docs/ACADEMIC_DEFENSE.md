@@ -7,7 +7,7 @@
 
 **Project Team Members:**
 - **Md. Asraful Islam Furdus** — Lead Full-Stack Architect
-- **Md Shakil Mia** — Full-Stack Developer & Collaborator
+- **Md Shakil Mia** — Collaborator
 
 **Approved Academic Title:**  
 *StudyFlow: An Authoritative Real-Time Collaborative Workspace for Group Pomodoro Synchronization and Distributed Task Management.*
@@ -316,5 +316,5 @@ npm test
 **Program:** ECSE (Electronics & Communication / Computer Science Engineering)  
 
 **Team Contributions:**
-- **Md. Asraful Islam Furdus** — Lead Full-Stack Architect: Full-stack system architecture, Next.js 16 App Router implementation, Express.js backend services, Socket.IO authoritative timer engine, Prisma ORM schema design, GSAP animations, and deployment orchestration.
-- **Md Shakil Mia** — Full-Stack Developer & Collaborator: Multi-user concurrency testing, presence heartbeat tracking, database relations & migrations, productivity analytics calculation algorithms, UI components, and automated test suite verification.
+- **Md. Asraful Islam Furdus** — Lead Full-Stack Architect: Full-stack system architecture, Next.js 16 App Router implementation, Express.js backend services, Socket.IO authoritative timer engine, Prisma ORM schema design, Web Design & Developing, GSAP animations, and deployment orchestration.
+- **Md Shakil Mia** — Finding and fixing bugs, write issues, and providing feedback on the project. Contributed to the development of the project by implementing features and improving the overall user experience.
