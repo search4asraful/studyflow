@@ -29,19 +29,27 @@ export function useRoomSocket(roomId: string | undefined) {
   const localTickerRef = useRef<NodeJS.Timeout | null>(null);
   const heartbeatRef = useRef<NodeJS.Timeout | null>(null);
   const isLeavingRef = useRef(false);
+  const isJoiningRef = useRef(false);
 
   const joinRoom = useCallback(() => {
     if (!roomId || isLeavingRef.current) return;
     const socket = getSocket();
 
+    // If socket is not yet connected, initiate connection and allow the 'connect' event listener to dispatch the join once
     if (!socket.connected) {
       socket.connect();
+      return;
     }
+
+    // Prevent concurrent duplicate joins
+    if (isJoiningRef.current) return;
+    isJoiningRef.current = true;
 
     socket.emit(
       SOCKET_EVENTS.CLIENT.ROOM_JOIN,
       { roomId },
       (response: { success: boolean; data?: any; error?: string }) => {
+        isJoiningRef.current = false;
         if (isLeavingRef.current) return;
         if (response?.success && response.data) {
           setRoomState(response.data);
@@ -61,7 +69,7 @@ export function useRoomSocket(roomId: string | undefined) {
 
     const socket = getSocket();
 
-    // 1. Initial room join
+    // 1. Join room if already connected, or connect will trigger it
     joinRoom();
 
     // 2. Re-join room automatically on socket connection / reconnection
@@ -221,6 +229,7 @@ export function useRoomSocket(roomId: string | undefined) {
       if (localTickerRef.current) clearInterval(localTickerRef.current);
       if (heartbeatRef.current) clearInterval(heartbeatRef.current);
 
+      isJoiningRef.current = false;
       socket.off('connect', joinRoom);
       socket.emit(SOCKET_EVENTS.CLIENT.ROOM_LEAVE, { roomId });
 
