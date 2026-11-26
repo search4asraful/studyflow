@@ -18,7 +18,7 @@ export const loginSchema = z.object({
 export const updateProfileSchema = z.object({
   name: z.string().min(2).max(50).optional(),
   bio: z.string().max(250).optional(),
-  avatarUrl: z.string().url().optional().or(z.literal('')),
+  avatarUrl: z.string().url().nullable().optional().or(z.literal('')),
   dailyGoalMinutes: z.number().int().min(10).max(1440).optional(),
   timezone: z.string().optional(),
   themePreference: z.enum(['dark', 'light', 'system']).optional(),
