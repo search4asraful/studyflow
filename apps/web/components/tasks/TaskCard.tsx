@@ -114,11 +114,12 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           <div className="flex items-center gap-1 min-w-0">
             {task.assignee ? (
               <div className="flex items-center gap-1 min-w-0">
-                <span className="truncate max-w-[90px]">{task.assignee.name.split(' ')[0]}</span>
-                {isAssignedToCurrentUser && (
-                  <span className="inline-flex items-center text-[9px] text-accent font-semibold ml-0.5">
-                    (You)
+                {isAssignedToCurrentUser ? (
+                  <span className="inline-flex items-center text-[9px] text-accent font-semibold px-1.5 py-0.2 rounded bg-accent/10 border border-accent/20">
+                    You
                   </span>
+                ) : (
+                  <span className="truncate max-w-[90px]">{task.assignee.name.split(' ')[0]}</span>
                 )}
               </div>
             ) : onClaim ? (
@@ -215,11 +216,12 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                   {task.assignee.name.charAt(0)}
                 </div>
               )}
-              <span className="text-[10px] truncate max-w-[85px]">{task.assignee.name}</span>
-              {isAssignedToCurrentUser && (
+              {isAssignedToCurrentUser ? (
                 <span className="inline-flex items-center text-[9px] font-semibold text-accent bg-accent/10 px-1.5 py-0.2 rounded border border-accent/20 shrink-0">
                   You
                 </span>
+              ) : (
+                <span className="text-[10px] truncate max-w-[85px]">{task.assignee.name}</span>
               )}
             </div>
           ) : onClaim ? (

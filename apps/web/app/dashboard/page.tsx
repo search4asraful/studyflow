@@ -135,9 +135,10 @@ export default function DashboardPage() {
     }
 
     // 3. Optimistic Cache Mutation
-    mutateApiCache<Task[]>('/tasks/my', (cached) =>
-      cached ? cached.map((t) => (t.id === task.id ? { ...t, status: nextStatus } : t)) : []
-    );
+    mutateApiCache<Task[]>('/tasks/my', (cached) => {
+      const base = Array.isArray(cached) && cached.length > 0 ? cached : tasks;
+      return base.map((t) => (t.id === task.id ? { ...t, status: nextStatus } : t));
+    });
 
     // 4. Background Sync with server & rollback on failure
     try {
@@ -146,11 +147,19 @@ export default function DashboardPage() {
         body: JSON.stringify({ status: nextStatus }),
       });
       setTasks((prev) => prev.map((t) => (t.id === task.id ? updated : t)));
+      mutateApiCache<Task[]>('/tasks/my', (cached) => {
+        const base = Array.isArray(cached) && cached.length > 0 ? cached : tasks;
+        return base.map((t) => (t.id === task.id ? updated : t));
+      });
       invalidateApiCache('/analytics/summary');
     } catch (err: any) {
       // Revert optimistic changes on network error
       setTasks(previousTasks);
-      mutateApiCache<Task[]>('/tasks/my', () => previousTasks);
+      mutateApiCache<Task[]>('/tasks/my', (cached) => {
+        const base = Array.isArray(cached) && cached.length > 0 ? cached : previousTasks;
+        const orig = previousTasks.find((t) => t.id === task.id);
+        return orig ? base.map((t) => (t.id === task.id ? orig : t)) : base;
+      });
       toast.error(err.message || 'Failed to update task');
     }
   };

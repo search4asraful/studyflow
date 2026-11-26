@@ -130,12 +130,14 @@ export class TaskService {
 
     const canManage =
       existing.createdById === userId ||
+      existing.assigneeId === userId ||
+      (input.assigneeId === userId && existing.assigneeId === null) ||
       userMember.role === RoomRole.OWNER ||
       userMember.role === RoomRole.MODERATOR;
 
     if (!canManage) {
       throw new ForbiddenError(
-        'Only the task creator, room host, or moderator can edit or move this task'
+        'Only the task creator, assignee, room host, or moderator can edit or move this task'
       );
     }
 

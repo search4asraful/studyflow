@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { format, addDays } from 'date-fns';
+import { useAuthStore } from '../../stores/authStore';
 
 const editTaskFormSchema = z.object({
   title: z.string().min(2, 'Title must be at least 2 characters').max(120),
@@ -100,6 +101,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
   task,
   members = [],
 }) => {
+  const authUser = useAuthStore((s) => s.user);
   const {
     register,
     handleSubmit,
@@ -312,13 +314,18 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
               <option value="" className="bg-surface text-foreground-muted">
                 Unassigned
               </option>
+              {authUser && !members.some((m) => m.userId === authUser.id) && (
+                <option value={authUser.id} className="bg-surface text-foreground font-semibold">
+                  {authUser.name} (You)
+                </option>
+              )}
               {members.length > 0 ? (
                 members.map((m) => (
                   <option key={m.userId} value={m.userId} className="bg-surface text-foreground">
-                    {m.user.name} ({m.role.toLowerCase()})
+                    {m.user.name} {m.userId === authUser?.id ? '(You)' : `(${m.role.toLowerCase()})`}
                   </option>
                 ))
-              ) : task.assignee ? (
+              ) : task.assignee && task.assignee.id !== authUser?.id ? (
                 <option value={task.assignee.id} className="bg-surface text-foreground">
                   {task.assignee.name} (Current)
                 </option>
